@@ -172,6 +172,23 @@ def test_end_to_end_produces_valid_xlsx(tmp_path) -> None:
     assert ws.max_row == result.written + 1
 
 
+def test_dedupe_raw_posts_drops_identical() -> None:
+    from datetime import datetime
+
+    from job_agent.models import RawPost
+    from job_agent.pipeline import _dedupe_raw_posts
+
+    d = datetime(2026, 1, 1)
+    posts = [
+        RawPost(raw_text="Вакансия PM", source="tg:a", url="a", date=d),
+        RawPost(raw_text="  вакансия   PM ", source="tg:b", url="b", date=d),  # тот же пост
+        RawPost(raw_text="Другая вакансия", source="tg:c", url="c", date=d),
+    ]
+    out = _dedupe_raw_posts(posts)
+    assert len(out) == 2
+    assert out[0].source == "tg:a" and out[1].source == "tg:c"  # первый остаётся
+
+
 def test_collector_failure_is_isolated(tmp_path, caplog) -> None:
     # Поломка одного источника (напр. getmatch 404) не валит прогон — собираем
     # по остальным (инвариант: адаптеры изолированы).

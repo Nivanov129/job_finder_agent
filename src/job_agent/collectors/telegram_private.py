@@ -53,6 +53,22 @@ def creds_present(creds: TelethonCreds | None) -> bool:
     return bool(creds and creds.api_id and creds.api_hash and creds.session)
 
 
+def creds_from_env() -> TelethonCreds | None:
+    """Собрать creds из окружения (TELEGRAM_API_ID/HASH/SESSION) — секреты в .env.
+
+    Так строка сессии (секрет) не попадает в config.json. Возвращает None, если
+    чего-то не хватает.
+    """
+    import os
+
+    creds = TelethonCreds(
+        api_id=os.environ.get("TELEGRAM_API_ID"),
+        api_hash=os.environ.get("TELEGRAM_API_HASH"),
+        session=os.environ.get("TELEGRAM_SESSION"),
+    )
+    return creds if creds_present(creds) else None
+
+
 def build_posts(
     messages: Iterable[PrivateMessage],
     handle: str,

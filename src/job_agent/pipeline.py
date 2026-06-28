@@ -21,7 +21,11 @@ from pathlib import Path
 
 from .collectors.base import Collector
 from .collectors.getmatch import GetmatchCollector
-from .collectors.telegram_private import make_private_collector
+from .collectors.telegram_private import (
+    creds_from_env,
+    creds_present,
+    make_private_collector,
+)
 from .collectors.telegram_public import TelegramPublicCollector
 from .collectors.vseti import VsetiCollector
 from .config import Config
@@ -31,7 +35,7 @@ from .engines import make_engine
 from .engines.base import Engine
 from .enrich.contacts import find_contacts
 from .enrich.cover import write_cover_letter
-from .models import EnrichedResult
+from .models import EnrichedResult, RawPost
 from .normalize import normalize_posts
 from .output.xlsx import write_xlsx
 from .prefilter import DEFAULT_LIMIT, DEFAULT_MIN_SIM, MapExample, prefilter_and_route
@@ -157,8 +161,12 @@ def build_collectors(
 
     private_handles = [c.handle for c in config.tg_channels if c.private]
     if private_handles:
+        # Секреты Telethon (api_id/api_hash/session) — из .env; конфиг как фолбэк.
+        creds = config.telethon_creds
+        if not creds_present(creds):
+            creds = creds_from_env()
         private = make_private_collector(
-            private_handles, config.telethon_creds, fetcher=private_fetcher
+            private_handles, creds, fetcher=private_fetcher
         )
         if private is not None:
             collectors.append(private)
@@ -168,6 +176,19 @@ def build_collectors(
         collectors.append(GetmatchCollector(fetcher=getmatch_fetcher))
 
     return collectors
+
+
+def _dedupe_raw_posts(posts: list[RawPost]) -> list[RawPost]:
+    """Убрать точные повторы постов по нормализованному тексту (первый — остаётся)."""
+    seen: set[str] = set()
+    out: list[RawPost] = []
+    for post in posts:
+        key = " ".join(post.raw_text.split()).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(post)
+    return out
 
 
 def run_pipeline(
@@ -213,6 +234,13 @@ def run_pipeline(
                     exc,
                 )
         collected = len(posts)
+
+        # Дедуп постов по тексту: один и тот же пост из нескольких каналов
+        # нормализуем один раз (экономия вызовов AI). Дедуп по смыслу
+        # (title+company из разных каналов) — позже в SeenStore.
+        posts = _dedupe_raw_posts(posts)
+        if len(posts) < collected:
+            logger.info("повторы постов убраны: %d → %d", collected, len(posts))
 
         # 2. Нормализация.
         vacancies = normalize_posts(posts, engine, output_lang=config.output_lang)

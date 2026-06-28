@@ -501,6 +501,64 @@ def test_save_backfill_starts_run_and_shows_run_page(tmp_path: Path) -> None:
     assert started  # backfill стартовал
 
 
+class _FakeTg:
+    def start(self, api_id, api_hash, phone):
+        return {"ok": True, "stage": "code", "message": "код отправлен"}
+
+    def submit_code(self, code):
+        return {"ok": True, "stage": "done", "message": "вход выполнен"}
+
+    def submit_password(self, password):
+        return {"ok": True, "stage": "done"}
+
+    def list_channels(self, api_id, api_hash, session):
+        return [{"id": "jobs", "title": "Jobs", "username": "jobs"}]
+
+
+def test_telegram_page_renders(tmp_path: Path) -> None:
+    client = TestClient(create_app(config_path=tmp_path / "config.json"))
+    body = client.get("/telegram").text
+    assert "Вход в Telegram" in body and 'name="tg_api_id"' in body
+    assert "/static/js/telegram.js" in body
+
+
+def test_telegram_login_start_and_code(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(config_path=tmp_path / "config.json", telegram_login=_FakeTg())
+    )
+    r = client.post(
+        "/telegram/login/start",
+        data={"api_id": "1", "api_hash": "h", "phone": "+79990001122"},
+    )
+    assert r.status_code == 200 and r.json()["stage"] == "code"
+    r2 = client.post("/telegram/login/code", data={"code": "11111"})
+    assert r2.status_code == 200 and r2.json()["stage"] == "done"
+
+
+def test_telegram_channels_lists(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(config_path=tmp_path / "config.json", telegram_login=_FakeTg())
+    )
+    data = client.post("/telegram/channels").json()
+    assert data["channels"][0]["id"] == "jobs"
+    assert "job" in data["channels"][0]  # помечен (классификация опциональна)
+
+
+def test_telegram_save_writes_private_channels(tmp_path: Path) -> None:
+    from job_agent.config import load_config
+
+    cfg_path = tmp_path / "config.json"
+    client = TestClient(
+        create_app(config_path=cfg_path, telegram_login=_FakeTg())
+    )
+    client.post("/save", data=_single_track_form())  # валидный базовый конфиг
+    r = client.post("/telegram/save", data={"channel": ["jobs", "product_jobs"]})
+    assert r.status_code == 200
+    cfg = load_config(cfg_path)
+    handles = {c.handle: c.private for c in cfg.tg_channels}
+    assert handles == {"jobs": True, "product_jobs": True}
+
+
 def test_run_status_and_output_routes(tmp_path: Path) -> None:
     client = TestClient(create_app(config_path=tmp_path / "config.json"))
     # статус по умолчанию — idle

@@ -29,6 +29,7 @@ __all__ = [
     "vacancy_card",
     "render_results",
     "render_run",
+    "render_telegram",
 ]
 
 #: Дефолтное число карточек подборки за прогон (топ по overall).
@@ -389,6 +390,57 @@ def _engine_header() -> str:
         '<div><div class="card__title">AI · авторизация</div>'
         '<div class="card__meta">движок скоринга и доступ к нему — локально</div></div>'
         "</div>"
+    )
+
+
+def render_telegram(*, has_api_id: str = "", has_api_hash: bool = False,
+                    has_session: bool = False) -> str:
+    """Экран «Telegram»: логин по телефону (api_id/api_hash → код → 2FA) +
+    выгрузка каналов с авто-подбором «про вакансии». Поток ведёт telegram.js."""
+    hash_note = ' <span class="hint-set">задан ✓</span>' if has_api_hash else ""
+    session_badge = (
+        '<span class="hint-set">вход выполнен ✓</span>' if has_session else ""
+    )
+    login = (
+        '<section class="card"><div class="card__title">'
+        f'{icon("ti-brand-telegram")} Вход в Telegram {session_badge}</div>'
+        '<div class="card__meta">Нужны api_id/api_hash с '
+        + _copy_cmd("my.telegram.org/apps")
+        + " — это безопасно (только чтение твоих каналов).</div>"
+        '<label class="field"><span class="field__label">api_id</span>'
+        f'<input class="input" name="tg_api_id" value="{escape(has_api_id)}" '
+        'placeholder="12345678"></label>'
+        f'<label class="field"><span class="field__label">api_hash{hash_note}</span>'
+        '<input class="input" type="password" name="tg_api_hash" '
+        'placeholder="вставьте api_hash"></label>'
+        '<label class="field"><span class="field__label">Телефон</span>'
+        '<input class="input" name="tg_phone" placeholder="+79991234567"></label>'
+        '<button type="button" class="btn btn--accent tg-start">'
+        f'{icon("ti-send")} Получить код</button>'
+        '<div class="login-flow__out" data-tg-login></div>'
+        "</section>"
+    )
+    channels = (
+        '<section class="card"><div class="card__title">'
+        f'{icon("ti-list-check")} Каналы</div>'
+        '<div class="card__meta">После входа: выгрузим твои каналы и AI отметит '
+        "те, что про вакансии. Сними/поставь галочки и сохрани.</div>"
+        '<button type="button" class="btn tg-channels">'
+        f'{icon("ti-refresh")} Выгрузить каналы</button>'
+        '<span class="path-input__status" data-tg-channels-status></span>'
+        '<div data-tg-channels-list></div>'
+        '<div class="form-footer"><button type="button" '
+        'class="btn btn--accent tg-save" hidden>Сохранить выбранные</button></div>'
+        "</section>"
+    )
+    return (
+        '<div class="app-header">'
+        f'<span class="app-header__icon">{icon("ti-brand-telegram")}</span>'
+        '<div><div class="card__title">Telegram</div>'
+        '<div class="card__meta">вход в твой аккаунт и подбор каналов с вакансиями'
+        "</div></div></div>"
+        + login
+        + channels
     )
 
 

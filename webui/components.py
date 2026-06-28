@@ -34,6 +34,7 @@ __all__ = [
 NAV_ITEMS: tuple[tuple[str, str, str], ...] = (
     ("/", "ti-adjustments", "Настройка"),
     ("/engine", "ti-cpu", "AI · авторизация"),
+    ("/telegram", "ti-brand-telegram", "Telegram"),
     ("/results", "ti-list-check", "Подборка"),
 )
 

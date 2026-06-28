@@ -24,6 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from job_agent.config import ConfigError, load_config
+from job_agent.engines import make_engine
 from webui.components import chip, icon, nav
 from webui.engine_status import engine_statuses, ollama_models, recommend_first
 from webui.env_store import merge_env, parse_env
@@ -34,9 +35,11 @@ from webui.render import (
     render_results,
     render_run,
     render_settings,
+    render_telegram,
     save_result_page,
 )
 from webui.runner import BackfillRunner
+from webui.telegram_login import classify_channels
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -94,6 +97,7 @@ def create_app(
     *,
     login_spawner: LoginSpawner | None = None,
     backfill_runner: BackfillRunner | None = None,
+    telegram_login: object | None = None,
 ) -> FastAPI:
     """Собрать FastAPI-приложение web-UI.
 
@@ -110,6 +114,16 @@ def create_app(
         envfile, spawn=login_spawner or default_spawner(envfile)
     )
     runner = backfill_runner or BackfillRunner()
+    # Telethon-логин ленив (создаёт фоновый event loop) — поднимаем при первом
+    # обращении; в тестах подменяется через telegram_login.
+    _tg: dict[str, object] = {"login": telegram_login}
+
+    def _tg_login() -> object:
+        if _tg["login"] is None:
+            from webui.telegram_login import TelegramLogin
+
+            _tg["login"] = TelegramLogin(envfile)
+        return _tg["login"]
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
@@ -274,6 +288,92 @@ def create_app(
             )
         return HTMLResponse(
             page(save_result_page(ok=True, action=action, path=str(written)), active="/")
+        )
+
+    @app.get("/telegram", response_class=HTMLResponse)
+    def telegram_page() -> str:
+        env = {**os.environ, **parse_env(envfile)}
+        return page(
+            render_telegram(
+                has_api_id=env.get("TELEGRAM_API_ID", ""),
+                has_api_hash=bool(env.get("TELEGRAM_API_HASH")),
+                has_session=bool(env.get("TELEGRAM_SESSION")),
+            ),
+            scripts='<script src="/static/js/telegram.js"></script>',
+            active="/telegram",
+        )
+
+    @app.post("/telegram/login/start")
+    async def telegram_start(request: Request) -> JSONResponse:
+        form = await request.form()
+        res = await run_in_threadpool(
+            _tg_login().start,
+            str(form.get("api_id", "")),
+            str(form.get("api_hash", "")),
+            str(form.get("phone", "")),
+        )
+        return JSONResponse(res, status_code=200 if res.get("ok") else 400)
+
+    @app.post("/telegram/login/code")
+    async def telegram_code(request: Request) -> JSONResponse:
+        form = await request.form()
+        res = await run_in_threadpool(_tg_login().submit_code, str(form.get("code", "")))
+        return JSONResponse(res, status_code=200 if res.get("ok") else 400)
+
+    @app.post("/telegram/login/password")
+    async def telegram_password(request: Request) -> JSONResponse:
+        form = await request.form()
+        res = await run_in_threadpool(
+            _tg_login().submit_password, str(form.get("password", ""))
+        )
+        return JSONResponse(res, status_code=200 if res.get("ok") else 400)
+
+    @app.post("/telegram/channels")
+    async def telegram_channels() -> JSONResponse:
+        # Выгрузить каналы по сессии из .env и пометить «про вакансии» (AI).
+        env = {**os.environ, **parse_env(envfile)}
+        channels = await run_in_threadpool(
+            _tg_login().list_channels,
+            env.get("TELEGRAM_API_ID", ""),
+            env.get("TELEGRAM_API_HASH", ""),
+            env.get("TELEGRAM_SESSION", ""),
+        )
+        if not channels:
+            return JSONResponse({"channels": [], "message": "каналы не получены — войдите"})
+        job_ids: set[str] = set()
+        try:  # классификация опциональна — без движка просто без авто-отметки
+            engine = make_engine(load_config(target))
+            job_ids = await run_in_threadpool(classify_channels, engine, channels)
+        except Exception:
+            job_ids = set()
+        out = [{**c, "job": str(c["id"]) in job_ids} for c in channels]
+        return JSONResponse({"channels": out})
+
+    @app.post("/telegram/save", response_class=HTMLResponse)
+    async def telegram_save(request: Request) -> HTMLResponse:
+        form = await request.form()
+        handles = [h for h in form.getlist("channel") if str(h).strip()]
+        updates = {
+            "tg_channels": [{"handle": str(h), "private": True} for h in handles]
+        }
+        try:
+            _merge_and_validate(updates, target)
+        except ConfigError as exc:
+            return HTMLResponse(
+                page(save_result_page(ok=False, message=str(exc)), active="/telegram"),
+                status_code=400,
+            )
+        return HTMLResponse(
+            page(
+                save_result_page(
+                    ok=True,
+                    path=str(target),
+                    note_html=f"Каналов сохранено: {len(handles)} (приватный сбор).",
+                    back_href="/telegram",
+                    back_label="вернуться в Telegram",
+                ),
+                active="/telegram",
+            )
         )
 
     @app.get("/run", response_class=HTMLResponse)

@@ -20,6 +20,7 @@ config.json
 .env
 *.sqlite
 *.sqlite3
+*.db
 *.xlsx
 # Runtime data dir: участниковый config.json, .env с токенами, авторизация
 # CLI-агентов (claude/codex), seen-store — никогда не коммитим.
