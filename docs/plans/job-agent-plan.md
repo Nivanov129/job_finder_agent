@@ -180,9 +180,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 1.12: XLSX-выход
-- [ ] `output/xlsx.py`: колонки §форматов через openpyxl, сорт по overall убыв., бейджи заливкой из `presentation.py` (Task 0.4), колонка `направление` скрыта при `is_single_track`.
-- [ ] Тест на заголовки, порядок, скрытие колонки, цвет заливки по диапазону.
-- [ ] Mark completed
+- [x] `output/xlsx.py`: колонки §форматов через openpyxl, сорт по overall убыв., бейджи заливкой из `presentation.py` (Task 0.4), колонка `направление` скрыта при `is_single_track`.
+- [x] Тест на заголовки, порядок, скрытие колонки, цвет заливки по диапазону.
+- [x] Mark completed
 
 ### Task 1.13: Сборка пайплайна + backfill CLI
 - [ ] `pipeline.py` (сшивает стадии 1–5 + xlsx, дефолтный порог `best_sim` конфигурируем), `cli.py` команда `backfill --days N --config path`, логи: собрано N · после фильтра M · топ-K.
