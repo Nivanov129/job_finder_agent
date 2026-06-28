@@ -145,9 +145,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 1.5: Адаптеры движков
-- [ ] `engines/cli.py` (shell-out к `claude`/`codex`), `engines/api_key.py` (Anthropic/OpenAI через httpx), `engines/ollama.py`. Сетевые вызовы за фасадом, секреты не логируются.
-- [ ] Тесты на фейках транспорта.
-- [ ] Mark completed
+- [x] `engines/cli.py` (shell-out к `claude`/`codex`), `engines/api_key.py` (Anthropic/OpenAI через httpx), `engines/ollama.py`. Сетевые вызовы за фасадом, секреты не логируются.
+- [x] Тесты на фейках транспорта.
+- [x] Mark completed
 
 ### Task 1.6: Нормализация
 - [ ] `normalize.py`: рендерит `prompts/normalize.md`, зовёт движок, парсит строгий JSON в `list[Vacancy]`, устойчиво к мусору (не-вакансия → пусто).
