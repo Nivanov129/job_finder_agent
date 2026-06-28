@@ -1,0 +1,74 @@
+# Job Agent — локальный стек: пайплайн + self-host web-поиск + прогрев модели
+# эмбеддингов. Запускается на машине участника, ничего не хостится централизованно.
+#
+# Перед запуском:
+#   - положить рядом config.json (валидный по config.schema.json), резюме,
+#     шаблоны и search-map.md в каталог данных (по умолчанию ./data);
+#   - в config.json указать web_search.url = http://searxng:8080 (имя сервиса
+#     в compose-сети, а не localhost).
+#
+# Always-on: ночной мониторинг требует включённого хоста (см. README).
+
+name: job-agent
+
+services:
+  # Прогрев модели эмбеддингов: один раз скачивает bge-m3 в общий том models,
+  # дальше пайплайн берёт её из кэша без сети. Сервис завершается успехом.
+  model-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: job-agent:latest
+    environment:
+      FASTEMBED_CACHE_PATH: /models
+    entrypoint: ["python", "-c"]
+    command:
+      - "from fastembed import TextEmbedding; TextEmbedding(model_name='BAAI/bge-m3'); print('embedding model ready')"
+    volumes:
+      - model_cache:/models
+    restart: "no"
+
+  # Self-host web-поиск для анализа компании на стадии скоринга.
+  searxng:
+    image: searxng/searxng:latest
+    environment:
+      # Внутри compose-сети пайплайн ходит на http://searxng:8080.
+      SEARXNG_BASE_URL: http://searxng:8080/
+    volumes:
+      - searxng_config:/etc/searxng
+    ports:
+      # Открыт на localhost для отладки/калибровки; продукт не хостит наружу.
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+
+  # Основной пайплайн: по умолчанию ночной инкрементальный прогон по расписанию.
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: job-agent:latest
+    depends_on:
+      model-init:
+        condition: service_completed_successfully
+      searxng:
+        condition: service_started
+    environment:
+      FASTEMBED_CACHE_PATH: /models
+      JOB_AGENT_SEEN_DB: /var/lib/job-agent/job_agent_seen.db
+    env_file:
+      # Секреты (API-ключи, Telethon, токен бота) — только через .env, не в образ.
+      - path: .env
+        required: false
+    volumes:
+      # Данные участника: config.json, резюме, шаблоны, карта поиска, выходной xlsx.
+      - ${JOB_AGENT_DATA:-./data}:/data
+      # Кэш модели эмбеддингов (read-only — пишет только model-init).
+      - model_cache:/models:ro
+      # Том для seen-store (дедуп/водяной знак nightly) — переживает пересоздание.
+      - seen_store:/var/lib/job-agent
+    restart: unless-stopped
+
+volumes:
+  model_cache:
+  seen_store:
+  searxng_config:

@@ -226,9 +226,9 @@ job-agent/
 ## Фаза 4 — Упаковка и инсталлер (милстоун 4)
 
 ### Task 4.1: Dockerfile + compose
-- [ ] `Dockerfile` (пайплайн), `compose.yml` (пайплайн + SearXNG + сервис эмбеддинг-модели + монтирование конфига/файлов участника + том для seen-store).
-- [ ] Прогнать `docker compose -f compose.yml config -q` (валидно). Если ralphex сам в контейнере — нужен `--docker` для доступа к Docker-сокету.
-- [ ] Mark completed
+- [x] `Dockerfile` (пайплайн), `compose.yml` (пайплайн + SearXNG + сервис эмбеддинг-модели + монтирование конфига/файлов участника + том для seen-store).
+- [x] Прогнать `docker compose -f compose.yml config -q` (валидно). Если ralphex сам в контейнере — нужен `--docker` для доступа к Docker-сокету.
+- [x] Mark completed
 
 ### Task 4.2: Install-скрипты
 - [ ] `install.sh` / `install.ps1`: проверяют Docker (нет → ссылка на Docker Desktop), тянут/собирают образы, поднимают стек, открывают конфиг. Порог установки самого Docker — на пользователе.
