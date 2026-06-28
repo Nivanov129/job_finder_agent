@@ -256,6 +256,43 @@
   border-radius: 4px;
 }
 
+/* server-driven вход: кнопка «Войти» + ссылка + форма кода */
+.login-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.login-flow__out:empty {
+  display: none;
+}
+
+.login-flow__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.login-flow__row .input {
+  flex: 1;
+  min-width: 160px;
+}
+
+.login-flow__msg {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.login-flow__msg.is-ok {
+  color: var(--text-accent);
+}
+
+.login-flow__msg.is-error {
+  color: var(--text-warning);
+}
+
 /* инлайн-результат авто-проверки на странице-подтверждении */
 .autoverify {
   font-size: 12px;

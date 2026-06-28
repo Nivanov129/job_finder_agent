@@ -27,6 +27,7 @@ from webui.components import chip, icon, nav
 from webui.engine_status import engine_statuses, ollama_models
 from webui.env_store import merge_env, parse_env
 from webui.forms import config_from_form, engine_config_from_form
+from webui.login_flow import LoginManager, LoginSpawner, default_spawner
 from webui.render import render_engine, render_results, render_settings, save_result_page
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -80,17 +81,25 @@ def page(body: str, *, scripts: str = "", active: str = "") -> str:
     )
 
 
-def create_app(config_path: Path | str | None = None) -> FastAPI:
+def create_app(
+    config_path: Path | str | None = None,
+    *,
+    login_spawner: LoginSpawner | None = None,
+) -> FastAPI:
     """Собрать FastAPI-приложение web-UI.
 
     `config_path` — куда писать `config.json` при сохранении формы (по умолчанию
-    корень репо; в тестах подменяется на tmp).
+    корень репо; в тестах подменяется на tmp). `login_spawner` — порождение
+    процесса входа (по умолчанию реальный Popen; в тестах — фейк).
     """
     app = FastAPI(title="Job agent web-UI")
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     target = Path(config_path) if config_path is not None else _DEFAULT_CONFIG_PATH
 
     envfile = target.parent / ".env"
+    logins = LoginManager(
+        envfile, spawn=login_spawner or default_spawner(envfile)
+    )
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
@@ -144,6 +153,22 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
         ollama_url = cfg.get("api_base_url", "") if cfg.get("scoring_engine") == "ollama" else ""
         statuses = engine_statuses(env=env, ollama_url=ollama_url)
         return JSONResponse({"engines": [s.as_dict() for s in statuses]})
+
+    @app.post("/engine/login/start")
+    async def engine_login_start(request: Request) -> JSONResponse:
+        # Сервер сам запускает claude setup-token / codex login и отдаёт ссылку
+        # для входа в браузере + режим (code — ждём код; callback — ждём браузер).
+        form = await request.form()
+        res = logins.start(str(form.get("engine", "")))
+        return JSONResponse(res, status_code=200 if res.get("ok") else 400)
+
+    @app.post("/engine/login/submit")
+    async def engine_login_submit(request: Request) -> JSONResponse:
+        # Завершить вход: для claude — код из формы → токен в .env; для codex —
+        # пустой код, дожидаемся подтверждения в браузере (выход процесса).
+        form = await request.form()
+        res = logins.submit(str(form.get("engine", "")), str(form.get("code", "")))
+        return JSONResponse(res, status_code=200 if res.get("ok") else 400)
 
     @app.post("/engine/test")
     async def engine_test(request: Request) -> JSONResponse:

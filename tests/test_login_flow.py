@@ -1,0 +1,103 @@
+"""Юнит-тесты server-driven входа — фейк-процесс, без реального CLI/сети."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from webui.env_store import parse_env
+from webui.login_flow import LoginManager, LoginProcess, LoginResult
+
+
+class _FakeClaude:
+    """Имитирует claude setup-token: ссылка → код → токен в результате."""
+
+    def __init__(self) -> None:
+        self._code: str | None = None
+
+    def read_url(self, timeout: float) -> str | None:
+        return "https://claude.ai/oauth/authorize?code=1"
+
+    def submit_code(self, code: str) -> None:
+        self._code = code
+
+    def result(self, timeout: float) -> LoginResult:
+        if self._code:
+            return LoginResult(True, "токен получен", token="sk-ant-oat01-FAKE")
+        return LoginResult(False, "код не введён")
+
+    def stop(self) -> None:
+        pass
+
+
+class _FakeCodex:
+    """Имитирует codex login: ссылка → завершение по браузеру (без токена)."""
+
+    def read_url(self, timeout: float) -> str | None:
+        return "https://auth.openai.com/oauth?x=1"
+
+    def submit_code(self, code: str) -> None:  # codex код не вводит
+        pass
+
+    def result(self, timeout: float) -> LoginResult:
+        return LoginResult(True, "вход выполнен")
+
+    def stop(self) -> None:
+        pass
+
+
+def _spawn(engine: str) -> LoginProcess:
+    return _FakeClaude() if engine == "claude" else _FakeCodex()
+
+
+def test_claude_start_returns_url_and_code_mode(tmp_path: Path) -> None:
+    mgr = LoginManager(tmp_path / ".env", spawn=_spawn)
+    res = mgr.start("claude")
+    assert res["ok"] is True
+    assert res["mode"] == "code"
+    assert str(res["url"]).startswith("https://")
+
+
+def test_claude_submit_writes_token_to_env(tmp_path: Path) -> None:
+    env = tmp_path / ".env"
+    mgr = LoginManager(env, spawn=_spawn)
+    mgr.start("claude")
+    res = mgr.submit("claude", "the-code")
+    assert res["ok"] is True
+    assert parse_env(env)["CLAUDE_CODE_OAUTH_TOKEN"] == "sk-ant-oat01-FAKE"
+
+
+def test_codex_callback_mode_no_token(tmp_path: Path) -> None:
+    env = tmp_path / ".env"
+    mgr = LoginManager(env, spawn=_spawn)
+    started = mgr.start("codex")
+    assert started["mode"] == "callback"
+    res = mgr.submit("codex")  # без кода — ждём подтверждения браузера
+    assert res["ok"] is True
+    # codex сам пишет auth.json, токена в .env нет
+    assert not env.exists() or "CLAUDE_CODE_OAUTH_TOKEN" not in parse_env(env)
+
+
+def test_submit_without_start_errors(tmp_path: Path) -> None:
+    mgr = LoginManager(tmp_path / ".env", spawn=_spawn)
+    res = mgr.submit("claude", "x")
+    assert res["ok"] is False
+    assert "не начат" in str(res["message"])
+
+
+def test_unsupported_engine_errors(tmp_path: Path) -> None:
+    mgr = LoginManager(tmp_path / ".env", spawn=_spawn)
+    res = mgr.start("ollama")
+    assert res["ok"] is False
+
+
+def test_start_replaces_prior_session(tmp_path: Path) -> None:
+    stopped: list[str] = []
+
+    class _Tracking(_FakeClaude):
+        def stop(self) -> None:
+            stopped.append("x")
+
+    mgr = LoginManager(tmp_path / ".env", spawn=lambda e: _Tracking())
+    mgr.start("claude")
+    mgr.start("claude")  # повторный старт закрывает прежнюю сессию
+    assert stopped  # прежний процесс остановлен

@@ -86,6 +86,69 @@
       });
   }
 
+  // Server-driven вход: показать ссылку + (для claude) форму кода.
+  function renderLoginOut(engine, data) {
+    var out = document.querySelector('[data-login-out="' + engine + '"]');
+    if (!out) return;
+    var link =
+      '<a class="btn" href="' + data.url + '" target="_blank" rel="noopener">' +
+      '<i class="ti ti-external-link"></i> Открыть вход</a>';
+    var action;
+    if (data.mode === "code") {
+      action =
+        '<input class="input login-code" data-engine="' + engine +
+        '" placeholder="вставьте код из браузера">' +
+        '<button type="button" class="btn btn--accent login-submit" data-engine="' +
+        engine + '">Готово</button>';
+    } else {
+      action =
+        '<button type="button" class="btn btn--accent login-submit" data-engine="' +
+        engine + '">Я авторизовался</button>';
+    }
+    out.innerHTML =
+      '<div class="login-flow__row">' + link + "</div>" +
+      '<div class="login-flow__row">' + action + "</div>" +
+      '<div class="login-flow__msg" data-login-msg="' + engine + '"></div>';
+  }
+
+  function setLoginMsg(engine, text, cls) {
+    var m = document.querySelector('[data-login-msg="' + engine + '"]');
+    if (m) { m.textContent = text; m.className = "login-flow__msg " + (cls || ""); }
+  }
+
+  function loginStart(engine) {
+    var out = document.querySelector('[data-login-out="' + engine + '"]');
+    if (out) out.innerHTML = '<div class="login-flow__msg">Запускаю вход…</div>';
+    var fd = new FormData();
+    fd.append("engine", engine);
+    fetch("/engine/login/start", { method: "POST", body: fd })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (res) {
+        if (res.ok && res.body.url) renderLoginOut(engine, res.body);
+        else if (out) out.innerHTML =
+          '<div class="login-flow__msg is-error">✗ ' +
+          (res.body.message || "не удалось начать вход") + "</div>";
+      })
+      .catch(function () {
+        if (out) out.innerHTML = '<div class="login-flow__msg is-error">✗ сеть</div>';
+      });
+  }
+
+  function loginSubmit(engine) {
+    var codeEl = document.querySelector('.login-code[data-engine="' + engine + '"]');
+    setLoginMsg(engine, "Завершаю вход…", "");
+    var fd = new FormData();
+    fd.append("engine", engine);
+    fd.append("code", codeEl ? codeEl.value : "");
+    fetch("/engine/login/submit", { method: "POST", body: fd })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (res) {
+        if (res.ok) { setLoginMsg(engine, "✓ " + (res.body.message || "вход выполнен"), "is-ok"); loadStatus(); }
+        else setLoginMsg(engine, "✗ " + (res.body.message || "ошибка"), "is-error");
+      })
+      .catch(function () { setLoginMsg(engine, "✗ сеть", "is-error"); });
+  }
+
   // Показывать панель только выбранного движка (настройка+статус для него).
   function togglePanels() {
     var sel = document.querySelector('input[name="engine"]:checked');
@@ -110,6 +173,11 @@
       setTimeout(function () { copyBtn.setAttribute("title", prev || "копировать"); }, 1500);
       return;
     }
+    // Server-driven вход: старт / завершение.
+    var startBtn = ev.target.closest(".login-start");
+    if (startBtn) { loginStart(startBtn.getAttribute("data-engine")); return; }
+    var submitBtn = ev.target.closest(".login-submit");
+    if (submitBtn) { loginSubmit(submitBtn.getAttribute("data-engine")); return; }
     // Кнопка «Проверить» на панели движка.
     var btn = ev.target.closest(".engine-test");
     if (!btn) return;

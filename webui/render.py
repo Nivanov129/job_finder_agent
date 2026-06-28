@@ -261,6 +261,17 @@ def _login_steps(steps: list[str]) -> str:
     return f'<ol class="auth-steps">{items}</ol>'
 
 
+def _login_widget(engine: str) -> str:
+    """Кнопка «Войти» + место для ссылки и формы кода (наполняет login.js)."""
+    return (
+        f'<div class="login-flow" data-login="{engine}">'
+        f'<button type="button" class="btn btn--accent login-start" '
+        f'data-engine="{engine}">{icon("ti-login-2")} Войти через браузер</button>'
+        f'<div class="login-flow__out" data-login-out="{engine}"></div>'
+        "</div>"
+    )
+
+
 def _auth_panel(
     key: str, title: str, hint_html: str, fields_html: str, *, visible: bool = False
 ) -> str:
@@ -325,30 +336,22 @@ def render_engine(
     claude_panel = _auth_panel(
         "claude",
         "Claude Code — нужна подписка Pro/Max",
-        _login_steps([
-            f"На хосте в терминале выполните {_copy_cmd('claude setup-token')} — "
-            "откроется вход через браузер.",
-            "Авторизуйтесь в Claude (нужна подписка Pro/Max).",
-            "Скопируйте показанный токен (живёт ~1 год) и вставьте в поле ниже.",
-            "«Сохранить» — токен проверится автоматически.",
-        ])
-        + '<div class="auth-panel__sub">Уже залогинены на хосте? Можно '
-        "переиспользовать вход через <code>JOB_AGENT_CLAUDE_DIR</code> — "
-        "тогда поле токена не нужно.</div>",
+        "Вход в один клик: сервер запустит <code>claude setup-token</code>, покажет "
+        "ссылку для входа — вы авторизуетесь в браузере, вставите код, и токен "
+        "сохранится автоматически (живёт ~1 год)."
+        + _login_widget("claude")
+        + '<div class="auth-panel__sub">Или вставьте токен вручную '
+        "(если запускали <code>claude setup-token</code> сами):</div>",
         secret_field("claude_token", "CLAUDE_CODE_OAUTH_TOKEN", "вставьте токен",
                      has=has_claude_token),
         visible=active == "claude",
     )
     codex_panel = _auth_panel(
         "codex",
-        "Codex — нужна подписка (вход через ChatGPT)",
-        _login_steps([
-            f"На хосте в смонтированном каталоге выполните {_copy_cmd('codex login')} "
-            "— откроется вход через браузер (аккаунт ChatGPT, без API-ключа).",
-            "Авторизуйтесь — вход сохранится в каталоге Codex "
-            "(<code>JOB_AGENT_CODEX_DIR</code>).",
-            "«Проверить» — убедиться, что вход подхватился.",
-        ]),
+        "Codex — вход через ChatGPT (без API-ключа)",
+        "Вход в один клик: сервер запустит <code>codex login</code> и покажет "
+        "ссылку — авторизуйтесь в браузере по аккаунту ChatGPT, вход сохранится."
+        + _login_widget("codex"),
         "",  # codex авторизуется по входу ChatGPT, поля ключа нет
         visible=active == "codex",
     )

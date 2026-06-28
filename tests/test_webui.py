@@ -371,6 +371,66 @@ def test_engine_page_shows_only_selected_panel(client: TestClient) -> None:
     assert 'name="codex_key"' not in body
 
 
+def test_engine_page_has_login_buttons(client: TestClient) -> None:
+    body = client.get("/engine").text
+    # server-driven вход: кнопка «Войти» у claude и codex
+    assert 'class="btn btn--accent login-start" data-engine="claude"' in body
+    assert 'class="btn btn--accent login-start" data-engine="codex"' in body
+
+
+def _login_app(tmp_path: Path):
+    """Приложение с фейк-спавнером входа (без реального CLI)."""
+    from webui.login_flow import LoginResult
+
+    class _FakeClaude:
+        def __init__(self) -> None:
+            self._code = None
+
+        def read_url(self, timeout: float):
+            return "https://claude.ai/oauth?x=1"
+
+        def submit_code(self, code: str) -> None:
+            self._code = code
+
+        def result(self, timeout: float):
+            return (
+                LoginResult(True, "ок", token="sk-ant-oat01-XYZ")
+                if self._code
+                else LoginResult(False, "нет кода")
+            )
+
+        def stop(self) -> None:
+            pass
+
+    return TestClient(
+        create_app(config_path=tmp_path / "config.json", login_spawner=lambda e: _FakeClaude())
+    )
+
+
+def test_login_start_route_returns_url(tmp_path: Path) -> None:
+    client = _login_app(tmp_path)
+    r = client.post("/engine/login/start", data={"engine": "claude"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True and body["mode"] == "code"
+    assert body["url"].startswith("https://")
+
+
+def test_login_submit_route_writes_token(tmp_path: Path) -> None:
+    client = _login_app(tmp_path)
+    client.post("/engine/login/start", data={"engine": "claude"})
+    r = client.post("/engine/login/submit", data={"engine": "claude", "code": "abc"})
+    assert r.status_code == 200 and r.json()["ok"] is True
+    env = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert "CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-XYZ" in env
+
+
+def test_login_start_unsupported_engine_400(tmp_path: Path) -> None:
+    client = _login_app(tmp_path)
+    r = client.post("/engine/login/start", data={"engine": "ollama"})
+    assert r.status_code == 400 and r.json()["ok"] is False
+
+
 def test_engine_save_ollama_uses_url_and_model(tmp_path: Path) -> None:
     from job_agent.config import load_config
 
@@ -413,12 +473,11 @@ def test_engine_save_ollama_cloud_key_to_env_not_config(tmp_path: Path) -> None:
     assert "sk-cloud" not in cfg_path.read_text(encoding="utf-8")
 
 
-def test_engine_page_has_login_wizard(client: TestClient) -> None:
+def test_engine_page_ollama_has_copy_steps(client: TestClient) -> None:
     body = client.get("/engine").text
-    # нумерованный гайд + кнопки «копировать команду»
+    # у Ollama остаётся гайд с кнопками «копировать команду»
     assert 'class="auth-steps"' in body
-    assert 'data-copy="claude setup-token"' in body
-    assert 'data-copy="codex login"' in body
+    assert 'data-copy="ollama.com/settings/keys"' in body
 
 
 def test_engine_save_triggers_autoverify(tmp_path: Path) -> None:
