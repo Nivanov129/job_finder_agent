@@ -96,16 +96,16 @@
       "type": "string",
       "enum": ["cli", "api_key", "ollama"],
       "default": "cli",
-      "description": "Движок скоринга (BYO). cli — Claude Code/Codex на подписке (дефолт). api_key — Anthropic/OpenAI. ollama — локально."
+      "description": "Движок скоринга (BYO). cli — Claude Code/Codex на подписке (дефолт). api_key — Anthropic/OpenAI. ollama — Ollama Cloud (облачные модели) или свой сервер."
     },
     "cli_tool": {
       "type": "string",
       "enum": ["claude", "codex"],
       "description": "Если scoring_engine=cli: какой инструмент установлен."
     },
-    "api_base_url": { "type": "string", "description": "Если scoring_engine=api_key." },
-    "api_key": { "type": "string", "description": "Если scoring_engine=api_key. Секрет, не логировать." },
-    "ollama_model": { "type": "string", "description": "Если scoring_engine=ollama, напр. 'llama3.1:70b'." },
+    "api_base_url": { "type": "string", "description": "Если scoring_engine=api_key — base URL провайдера; если scoring_engine=ollama — адрес своего сервера Ollama (по умолчанию облако https://ollama.com)." },
+    "api_key": { "type": "string", "description": "Если scoring_engine=api_key. Секрет, не логировать. Ключ Ollama Cloud (OLLAMA_API_KEY) хранится в .env, не здесь." },
+    "ollama_model": { "type": "string", "description": "Если scoring_engine=ollama, напр. 'gpt-oss:120b' (облако) или 'llama3.1:70b' (свой сервер)." },
 
     "web_search": {
       "type": "object",

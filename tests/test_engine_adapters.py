@@ -170,6 +170,42 @@ def test_ollama_request_shape_no_stream() -> None:
     assert body["stream"] is False
     assert body["model"] == "llama3.1"
     assert body["messages"] == [{"role": "user", "content": "P"}]
+    # Локальный сервер — без заголовка авторизации.
+    assert "authorization" not in headers
+
+
+def test_ollama_cloud_adds_bearer_auth() -> None:
+    _, headers, _ = ollama_build_request(
+        "https://ollama.com", "gpt-oss:120b", "P", api_key="sk-cloud"
+    )
+    assert headers["authorization"] == "Bearer sk-cloud"
+
+
+def test_ollama_from_config_reads_cloud_key_from_env(monkeypatch) -> None:
+    monkeypatch.setenv("OLLAMA_API_KEY", "sk-from-env")
+    captured: dict[str, str] = {}
+
+    def transport(url: str, headers: dict[str, str], body: dict) -> dict:
+        captured.update(headers)
+        return {"message": {"content": "ok"}}
+
+    engine = OllamaEngine.from_config(
+        _config("ollama", ollama_model="gpt-oss:120b"), transport=transport
+    )
+    engine.complete("x")
+    assert captured["authorization"] == "Bearer sk-from-env"
+
+
+def test_ollama_defaults_to_cloud_host(monkeypatch) -> None:
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+    captured: dict[str, str] = {}
+
+    def transport(url: str, headers: dict[str, str], body: dict) -> dict:
+        captured["url"] = url
+        return {"message": {"content": "ok"}}
+
+    OllamaEngine("gpt-oss:120b", transport=transport).complete("x")
+    assert captured["url"] == "https://ollama.com/api/chat"
 
 
 def test_ollama_parse_response() -> None:
