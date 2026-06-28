@@ -140,9 +140,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 1.4: Интерфейс AI-движка + фейк
-- [ ] `engines/base.py` (`Engine.complete(prompt, *, web_search=False)->str`), `engines/__init__.py` фабрика по `scoring_engine`, фейковый движок для тестов.
-- [ ] Тест фабрики и фейка.
-- [ ] Mark completed
+- [x] `engines/base.py` (`Engine.complete(prompt, *, web_search=False)->str`), `engines/__init__.py` фабрика по `scoring_engine`, фейковый движок для тестов.
+- [x] Тест фабрики и фейка.
+- [x] Mark completed
 
 ### Task 1.5: Адаптеры движков
 - [ ] `engines/cli.py` (shell-out к `claude`/`codex`), `engines/api_key.py` (Anthropic/OpenAI через httpx), `engines/ollama.py`. Сетевые вызовы за фасадом, секреты не логируются.
