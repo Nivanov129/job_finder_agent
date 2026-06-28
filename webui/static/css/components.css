@@ -1,0 +1,113 @@
+/* Общие компоненты web-UI: бейдж, чип, карточка.
+   Цвета бейджа «резюме %» и тега направления приходят инлайном из
+   src/job_agent/presentation.py (единственный источник цветового кодирования) —
+   здесь только геометрия. */
+
+/* ── бейдж «резюме %» ─────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  /* --badge-bg / --badge-fg ставятся инлайном из presentation.py */
+  background: var(--badge-bg, var(--surface-1));
+  color: var(--badge-fg, var(--text-primary));
+}
+
+/* тег направления (скрыт при единственном треке — решает вызывающий код) */
+.track-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--badge-bg, #EEEDFE);
+  color: var(--badge-fg, #3C3489);
+}
+
+/* ── чип ──────────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 0.5px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: default;
+}
+
+.chip--on {
+  background: var(--bg-accent);
+  border-color: var(--border-accent);
+  color: var(--text-accent);
+}
+
+/* ── карточка ─────────────────────────────────────────────────── */
+.card {
+  background: var(--surface-2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card__title {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.card__meta {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* внутренняя панель */
+.panel {
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: 12px;
+  background: var(--surface-1);
+}
+
+.panel--dashed {
+  border-style: dashed;
+}
+
+/* шапка приложения */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-header__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius);
+  background: var(--bg-accent);
+  color: var(--text-accent);
+  font-size: 22px;
+}
+
+/* warning-плашка */
+.notice-warning {
+  border: 0.5px solid var(--border-warning);
+  background: var(--bg-warning);
+  color: var(--text-warning);
+  border-radius: var(--radius-panel);
+  padding: 12px;
+  font-size: 13px;
+}
