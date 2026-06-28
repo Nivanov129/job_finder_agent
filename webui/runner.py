@@ -74,12 +74,22 @@ class BackfillRunner:
 
 
 def _default_run(config_path: Path) -> dict[str, Any]:  # pragma: no cover - пайплайн
-    """Боевой прогон: грузит конфиг и гоняет backfill, пишет .xlsx рядом."""
+    """Боевой прогон: грузит конфиг и гоняет backfill, пишет .xlsx рядом.
+
+    Перед запуском подмешиваем свежий `.env` в окружение — токен движка, ключ
+    Ollama и сессия Telegram могли быть сохранены уже после старта контейнера
+    (UI-прогон идёт в этом же процессе, чьё окружение иначе устарело).
+    """
+    import os
+
     from job_agent.config import load_config
     from job_agent.pipeline import run_backfill
 
-    config = load_config(config_path)
+    from .env_store import parse_env
+
     base = Path(config_path).resolve().parent
+    os.environ.update(parse_env(base / ".env"))
+    config = load_config(config_path)
     out = base / "backfill.xlsx"
     result = run_backfill(config, base_dir=base, output_path=out)
     return {
