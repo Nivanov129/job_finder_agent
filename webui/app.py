@@ -33,7 +33,7 @@ from webui.login_flow import LoginManager, LoginSpawner, default_spawner
 from webui.render import (
     render_agent,
     render_engine,
-    render_results,
+    render_results_screen,
     render_run,
     render_settings,
     render_telegram,
@@ -167,9 +167,12 @@ def create_app(
 
     @app.get("/results", response_class=HTMLResponse)
     def results() -> str:
-        # Прогоны нигде не персистятся — пока нет данных, показываем пустое
-        # состояние. Карточки собирает чистая `render_results` (юнит-тесты).
-        return page(render_results([]), active="/results")
+        # Карточки строит results.js по /run/results (живые результаты прогона).
+        return page(
+            render_results_screen(),
+            scripts='<script src="/static/js/results.js"></script>',
+            active="/results",
+        )
 
     @app.get("/engine", response_class=HTMLResponse)
     def engine() -> str:

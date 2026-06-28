@@ -30,6 +30,7 @@ __all__ = [
     "render_results",
     "render_run",
     "render_agent",
+    "render_results_screen",
     "render_telegram",
 ]
 
@@ -529,6 +530,21 @@ def render_telegram(*, has_session: bool = False, saved: list[str] | None = None
         "</div></div></div>"
         + login
         + channels
+    )
+
+
+def render_results_screen() -> str:
+    """Экран «Подборка»: фильтры по направлению + сетка карточек с двойными
+    кольцами. Карточки строит results.js по /run/results (живой прогон)."""
+    return (
+        '<div class="res-bar">'
+        '<div class="res-filters" data-res-filters></div>'
+        '<a class="btn btn--accent" href="/run/output.xlsx" download>'
+        f'{icon("ti-download")} Скачать .xlsx</a></div>'
+        '<div class="res-grid" data-res-grid></div>'
+        '<div class="res-empty" data-res-empty hidden>'
+        f'{icon("ti-stack-2")}<div>Пока пусто. Запусти «Подбор за период» или '
+        "включи агента — финалисты появятся здесь по мере оценки.</div></div>"
     )
 
 
