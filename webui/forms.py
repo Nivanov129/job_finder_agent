@@ -49,7 +49,6 @@ def _tracks_from_form(form: FormLike) -> list[dict[str, Any]]:
     names = [_clean(v) for v in form.getlist("track_name")]
     resumes = [_clean(v) for v in form.getlist("track_resume")]
     templates = [_clean(v) for v in form.getlist("track_template")]
-    rubrics = [_clean(v) for v in form.getlist("track_rubric")]
     roles = [_clean(v) for v in form.getlist("track_roles")]
 
     tracks: list[dict[str, Any]] = []
@@ -65,8 +64,6 @@ def _tracks_from_form(form: FormLike) -> list[dict[str, Any]]:
         }
         if i < len(templates) and templates[i]:
             track["cover_template_path"] = templates[i]
-        if i < len(rubrics) and rubrics[i]:
-            track["rubric"] = rubrics[i]
         if i < len(roles) and roles[i]:
             track["role_gate"] = _split(roles[i])
         tracks.append(track)

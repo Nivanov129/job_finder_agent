@@ -80,7 +80,7 @@ def path_field(
 
 
 def track_card(*, removable: bool = True) -> str:
-    """Одна повторяемая карточка направления (имя · резюме · шаблон · рубрика · роли).
+    """Одна повторяемая карточка направления (имя · резюме · шаблон · роли).
 
     Используется и для серверного рендера первой карточки, и как тело `<template>`
     для клонирования по «+ добавить направление».
@@ -104,19 +104,16 @@ def track_card(*, removable: bool = True) -> str:
             label_html=f'{icon("ti-file-cv")} Резюме (путь к файлу)',
             placeholder="./resumes/backend.pdf",
             kind="resume",
-            accept=".pdf,.doc,.docx,.txt,.md,.rtf",
+            accept=".pdf,.txt,.md",
         )
         + path_field(
             name="track_template",
             label_html=f'{icon("ti-mail")} Шаблон сопроводительного · пример (опц.)',
-            placeholder="./cover-templates/default.md",
+            placeholder="./cover-templates/default.pdf",
             kind="template",
-            accept=".md,.txt",
+            accept=".pdf,.txt,.md",
         )
         +
-        '<label class="field"><span class="field__label">Рубрика — «что для меня '
-        'попадание» (опц.)</span>'
-        '<textarea class="input" name="track_rubric" rows="2"></textarea></label>'
         '<label class="field"><span class="field__label">Допустимые роли (опц., '
         'через запятую)</span>'
         '<input class="input" name="track_roles" '
@@ -137,7 +134,7 @@ def _profile_card() -> str:
             label_html=f'{icon("ti-map-2")} Карта поиска · общая',
             placeholder="./search-map.md — примеры идеальных вакансий",
             kind="search_map",
-            accept=".md,.txt,.json",
+            accept=".pdf,.md,.txt,.json",
         )
         + "</div>"
     )
@@ -145,7 +142,7 @@ def _profile_card() -> str:
         '<section class="card">'
         f'<div class="card__title">{icon("ti-user")} Профиль</div>'
         '<div class="card__meta">Одно или несколько направлений. Каждое '
-        "самодостаточно: своё резюме, шаблон и рубрика.</div>"
+        "самодостаточно: своё резюме и шаблон.</div>"
         '<div id="tracks-list" class="tracks-grid">' + track_card(removable=True) + "</div>"
         '<button type="button" class="btn btn--ghost" id="add-track">'
         f'{icon("ti-plus")} Добавить направление</button>'

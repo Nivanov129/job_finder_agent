@@ -172,6 +172,15 @@ def test_settings_has_upload_controls(client: TestClient) -> None:
     assert 'type="file"' in body and "file-upload__input" in body
     # загрузка ходит на /upload (через локальный settings.js, без CDN)
     assert "/static/js/settings.js" in body
+    # PDF принимается во всех полях-путях (резюме, шаблон, карта)
+    assert body.count("accept=") >= 3
+    assert ".pdf" in body
+
+
+def test_settings_has_no_rubric_field(client: TestClient) -> None:
+    body = client.get("/").text
+    assert "track_rubric" not in body
+    assert "что для меня" not in body
 
 
 def test_upload_saves_file_and_returns_relative_path(tmp_path: Path) -> None:
@@ -261,7 +270,6 @@ def _single_track_form() -> dict[str, str]:
         "track_name": "Backend",
         "track_resume": "./resumes/backend.pdf",
         "track_template": "./cover-templates/default.md",
-        "track_rubric": "Сильная инженерная команда",
         "track_roles": "Backend Engineer, Tech Lead",
         "engine": "cli",
         "cli_tool": "claude",
@@ -305,7 +313,6 @@ def test_save_three_tracks_writes_valid_config(tmp_path: Path) -> None:
         "track_name": ["Backend", "Скейлап", "AI"],  # кириллица → id-фолбэк
         "track_resume": ["./r/backend.pdf", "./r/scaleup.pdf", "./r/ai.pdf"],
         "track_template": ["", "", ""],
-        "track_rubric": ["", "", ""],
         "track_roles": ["", "", ""],
         "engine": "ollama",
         "ollama_model": "llama3.1:70b",

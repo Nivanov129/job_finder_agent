@@ -64,11 +64,26 @@ class RunResult:
     output_path: Path | None = None
 
 
-def _read_text(path: str | Path, base_dir: Path) -> str:
-    """Прочитать текстовый файл (резюме/карта), резолвя относительный путь от base_dir."""
+def _extract_pdf_text(path: Path) -> str:
+    """Текстовый слой PDF через pypdf (страницы склеиваются через перевод строки)."""
+    from pypdf import PdfReader
+
+    reader = PdfReader(str(path))
+    return "\n".join(page.extract_text() or "" for page in reader.pages).strip()
+
+
+def _read_document(path: str | Path, base_dir: Path) -> str:
+    """Прочитать резюме/шаблон/карту как текст, резолвя путь от base_dir.
+
+    `.pdf` извлекается через pypdf (текстовый слой), остальное читается как utf-8
+    (md/txt/json). Скан-PDF без текстового слоя дадут пустую/неполную строку —
+    пользователь загружает текстовый PDF.
+    """
     p = Path(path)
     if not p.is_absolute():
         p = base_dir / p
+    if p.suffix.lower() == ".pdf":
+        return _extract_pdf_text(p)
     return p.read_text(encoding="utf-8")
 
 
@@ -76,12 +91,11 @@ def load_track_resumes(config: Config, base_dir: Path) -> dict[str, str]:
     """id трека → текст резюме. Пути из `track.resume_path` (относительно base_dir).
 
     Чтение текста — забота оркестратора (пре-фильтр работает уже с готовыми
-    строками). Поддерживаются текстовые форматы (md/txt); бинарные резюме
-    конвертируются пользователем заранее.
+    строками). Поддерживаются PDF (текстовый слой) и текстовые форматы (md/txt).
     """
     resumes: dict[str, str] = {}
     for track in config.tracks:
-        resumes[track.id] = _read_text(track.resume_path, base_dir)
+        resumes[track.id] = _read_document(track.resume_path, base_dir)
     return resumes
 
 
@@ -94,7 +108,7 @@ def load_cover_templates(config: Config, base_dir: Path) -> dict[str, str | None
     templates: dict[str, str | None] = {}
     for track in config.tracks:
         if track.cover_template_path:
-            templates[track.id] = _read_text(track.cover_template_path, base_dir)
+            templates[track.id] = _read_document(track.cover_template_path, base_dir)
         else:
             templates[track.id] = None
     return templates
@@ -116,7 +130,7 @@ def map_examples(config: Config, base_dir: Path) -> list[MapExample]:
         path = Path(sm.path)
         resolved = path if path.is_absolute() else base_dir / path
         if resolved.exists():
-            text = resolved.read_text(encoding="utf-8").strip()
+            text = _read_document(resolved, base_dir).strip()
             if text:
                 examples.append((text, None))
     return examples
