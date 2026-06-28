@@ -531,16 +531,33 @@ def render_telegram(*, has_session: bool = False, saved: list[str] | None = None
     )
 
 
-def render_run() -> str:
-    """Страница «Прогон»: статус backfill (наполняет run.js опросом /run/status)."""
+def render_run(agent_interval: int = 30) -> str:
+    """Страница «Прогон»: статус прогона + режим агента (run.js опрашивает статус)."""
+    agent = (
+        '<section class="card"><div class="card__title">'
+        f'{icon("ti-robot")} Агент · авто-поиск '
+        '<span class="run-status" data-agent-state></span></div>'
+        '<div class="card__meta">Сам запускает поиск каждые N минут и догоняет '
+        "вакансии с момента прошлого прогона.</div>"
+        '<div class="login-flow__row">'
+        '<label class="field" style="max-width:200px"><span class="field__label">'
+        'Пауза между прогонами (мин)</span>'
+        f'<input class="input" type="number" data-agent-interval min="5" max="1440" '
+        f'value="{agent_interval}"></label>'
+        '<button type="button" class="btn btn--accent agent-toggle" '
+        'style="align-self:flex-end"></button></div>'
+        '<div class="card__meta" data-agent-info></div>'
+        "</section>"
+    )
     return (
         '<div class="app-header">'
         f'<span class="app-header__icon">{icon("ti-player-play")}</span>'
-        '<div><div class="card__title">Прогон backfill</div>'
+        '<div><div class="card__title">Прогон</div>'
         '<div class="card__meta">сбор → фильтр → скоринг → .xlsx</div></div>'
         "</div>"
-        '<section class="card"><div class="run-status" data-run-status>'
-        f'{icon("ti-loader")} запускаю…</div></section>'
+        + agent
+        + '<section class="card"><div class="run-status" data-run-status>'
+        f'{icon("ti-loader")} статус…</div></section>'
         '<p><a href="/">← к настройке</a> · <a href="/results">подборка</a></p>'
     )
 

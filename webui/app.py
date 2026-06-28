@@ -38,7 +38,7 @@ from webui.render import (
     render_telegram,
     save_result_page,
 )
-from webui.runner import BackfillRunner
+from webui.runner import BackfillRunner, read_last_run
 from webui.telegram_login import (
     DEFAULT_API_HASH,
     DEFAULT_API_ID,
@@ -291,7 +291,7 @@ def create_app(
             runner.start(target)
             return HTMLResponse(
                 page(
-                    render_run(),
+                    render_run(int(_load_raw(target).get('agent_interval_minutes', 30))),
                     scripts='<script src="/static/js/run.js"></script>',
                     active="/run",
                 )
@@ -409,7 +409,7 @@ def create_app(
     @app.get("/run", response_class=HTMLResponse)
     def run_page() -> str:
         return page(
-            render_run(),
+            render_run(int(_load_raw(target).get('agent_interval_minutes', 30))),
             scripts='<script src="/static/js/run.js"></script>',
             active="/run",
         )
@@ -417,6 +417,36 @@ def create_app(
     @app.get("/run/status")
     def run_status() -> JSONResponse:
         return JSONResponse(runner.state())
+
+    @app.post("/agent/start")
+    async def agent_start(request: Request) -> JSONResponse:
+        form = await request.form()
+        cfg = _load_raw(target)
+        try:
+            interval = int(
+                str(form.get("interval", "")) or cfg.get("agent_interval_minutes", 30)
+            )
+        except ValueError:
+            interval = 30
+        interval = max(5, min(1440, interval))
+        try:  # запомнить интервал в конфиг
+            _merge_and_validate({"agent_interval_minutes": interval}, target)
+        except ConfigError:
+            pass
+        runner.start_agent(target, interval)
+        return JSONResponse({"ok": True, "interval_min": interval})
+
+    @app.post("/agent/stop")
+    def agent_stop() -> JSONResponse:
+        runner.stop_agent()
+        return JSONResponse({"ok": True})
+
+    @app.get("/agent/status")
+    def agent_status() -> JSONResponse:
+        st = runner.agent_status()
+        last = read_last_run(target.parent / "last_run.json")
+        st["last_run"] = last.isoformat() if last else ""
+        return JSONResponse(st)
 
     @app.get("/run/output.xlsx")
     def run_output() -> Response:

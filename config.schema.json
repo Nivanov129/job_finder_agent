@@ -170,6 +170,13 @@
       "type": "boolean",
       "default": true,
       "description": "Грубо отсеивать посты по названию должности (из резюме) ДО нормализации."
+    },
+    "agent_interval_minutes": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 1440,
+      "default": 30,
+      "description": "Режим агента: пауза между авто-прогонами (минуты)."
     }
   },
 

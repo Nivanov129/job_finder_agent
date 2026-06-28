@@ -482,7 +482,7 @@ def test_save_backfill_starts_run_and_shows_run_page(tmp_path: Path) -> None:
     from webui.runner import BackfillRunner
 
     started: list[str] = []
-    runner = BackfillRunner(run=lambda p, prog: started.append(str(p)) or {"written": 0})
+    runner = BackfillRunner(run=lambda p, prog, agent: started.append(str(p)) or {"written": 0})
     client = TestClient(
         create_app(config_path=tmp_path / "config.json", backfill_runner=runner)
     )
@@ -490,7 +490,7 @@ def test_save_backfill_starts_run_and_shows_run_page(tmp_path: Path) -> None:
     form["action"] = "backfill"
     r = client.post("/save", data=form)
     assert r.status_code == 200
-    assert "Прогон backfill" in r.text and "/static/js/run.js" in r.text
+    assert "Агент · авто-поиск" in r.text and "/static/js/run.js" in r.text
     # прогон реально запущен (фейк-раннер позвали)
     for _ in range(100):
         if started:
@@ -569,6 +569,26 @@ def test_telegram_save_writes_private_channels(tmp_path: Path) -> None:
     cfg = load_config(cfg_path)
     handles = {c.handle: c.private for c in cfg.tg_channels}
     assert handles == {"jobs": True, "product_jobs": True}
+
+
+def test_agent_start_stop_status(tmp_path: Path) -> None:
+    import time
+
+    from webui.runner import BackfillRunner
+
+    runner = BackfillRunner(run=lambda p, prog, agent: {})
+    client = TestClient(
+        create_app(config_path=tmp_path / "config.json", backfill_runner=runner)
+    )
+    assert client.get("/agent/status").json()["enabled"] is False
+    r = client.post("/agent/start", data={"interval": "10"})
+    assert r.status_code == 200 and r.json()["interval_min"] == 10
+    for _ in range(200):  # дождаться старта фонового цикла агента
+        if client.get("/agent/status").json()["enabled"]:
+            break
+        time.sleep(0.01)
+    assert client.get("/agent/status").json()["enabled"] is True
+    assert client.post("/agent/stop").json()["ok"] is True
 
 
 def test_run_status_and_output_routes(tmp_path: Path) -> None:

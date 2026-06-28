@@ -17,7 +17,7 @@ def _wait(runner: BackfillRunner, timeout: float = 2.0) -> None:
 
 def test_runner_done_with_counters(tmp_path: Path) -> None:
     runner = BackfillRunner(
-        run=lambda p, prog: {
+        run=lambda p, prog, agent: {
             "collected": 5, "after_filter": 3, "written": 2, "output": "backfill.xlsx"
         }
     )
@@ -30,7 +30,7 @@ def test_runner_done_with_counters(tmp_path: Path) -> None:
 
 
 def test_runner_error_surfaces_message(tmp_path: Path) -> None:
-    def boom(p: Path, prog) -> dict:
+    def boom(p: Path, prog, agent) -> dict:
         raise RuntimeError("резюме не найдено")
 
     runner = BackfillRunner(run=boom)
@@ -44,7 +44,7 @@ def test_runner_error_surfaces_message(tmp_path: Path) -> None:
 def test_runner_progress_updates_state(tmp_path: Path) -> None:
     gate = threading.Event()
 
-    def run(p: Path, prog) -> dict:
+    def run(p: Path, prog, agent) -> dict:
         prog("normalize", {"collected": 7})
         gate.wait(2.0)
         return {"written": 1}
@@ -61,10 +61,40 @@ def test_runner_progress_updates_state(tmp_path: Path) -> None:
     _wait(runner)
 
 
+def test_last_run_roundtrip(tmp_path: Path) -> None:
+    from datetime import UTC, datetime
+
+    from webui.runner import read_last_run, write_last_run
+
+    p = tmp_path / "last_run.json"
+    assert read_last_run(p) is None
+    when = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
+    write_last_run(p, when)
+    assert read_last_run(p) == when
+
+
+def test_agent_triggers_run_in_agent_mode(tmp_path: Path) -> None:
+    calls: list[bool] = []
+
+    def run(p: Path, prog, agent) -> dict:
+        calls.append(agent)
+        return {}
+
+    runner = BackfillRunner(run=run)
+    runner.start_agent(tmp_path / "c.json", interval_min=60)
+    for _ in range(300):  # первый прогон стартует сразу, не ждём интервал
+        if calls:
+            break
+        time.sleep(0.01)
+    runner.stop_agent()
+    assert calls == [True]  # один авто-прогон, agent_mode=True
+    assert runner.agent_status()["interval_min"] == 60
+
+
 def test_runner_single_run_at_a_time(tmp_path: Path) -> None:
     gate = threading.Event()
 
-    def blocking(p: Path, prog) -> dict:
+    def blocking(p: Path, prog, agent) -> dict:
         gate.wait(2.0)
         return {"collected": 1}
 

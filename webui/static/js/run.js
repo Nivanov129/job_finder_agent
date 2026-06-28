@@ -48,6 +48,47 @@
       .catch(function () {});
   }
 
-  var timer = setInterval(poll, 2000);
+  // ── Режим агента ──────────────────────────────────────────────────
+  function pollAgent() {
+    fetch("/agent/status")
+      .then(function (r) { return r.json(); })
+      .then(function (a) {
+        var state = document.querySelector("[data-agent-state]");
+        var info = document.querySelector("[data-agent-info]");
+        var btn = document.querySelector(".agent-toggle");
+        if (btn) btn.textContent = a.enabled ? "Выключить агента" : "Включить агента";
+        if (state) {
+          state.textContent = a.enabled ? "вкл" : "выкл";
+          state.className = "run-status" + (a.enabled ? " is-ok" : "");
+        }
+        if (info) {
+          var parts = [];
+          if (a.last_run) parts.push("последний прогон: " + new Date(a.last_run).toLocaleString());
+          else parts.push("прогонов ещё не было");
+          if (a.enabled && a.seconds_to_next != null)
+            parts.push("следующий через ~" + Math.ceil(a.seconds_to_next / 60) + " мин");
+          info.textContent = parts.join(" · ");
+        }
+      })
+      .catch(function () {});
+  }
+
+  document.addEventListener("click", function (ev) {
+    if (!ev.target.closest(".agent-toggle")) return;
+    fetch("/agent/status")
+      .then(function (r) { return r.json(); })
+      .then(function (a) {
+        if (a.enabled) return fetch("/agent/stop", { method: "POST" });
+        var iv = document.querySelector("[data-agent-interval]");
+        var fd = new FormData();
+        fd.append("interval", iv ? iv.value : "30");
+        return fetch("/agent/start", { method: "POST", body: fd });
+      })
+      .then(function () { pollAgent(); });
+  });
+
+  setInterval(poll, 2000);
+  setInterval(pollAgent, 5000);
   poll();
+  pollAgent();
 })();

@@ -112,6 +112,9 @@ class Config(BaseModel):
     # названию должности (из резюме) ДО нормализации — чтобы не гонять AI зря.
     parallelism: int = 4
     title_prefilter: bool = True
+    # Режим агента: пауза между авто-прогонами (минуты). Каждый прогон догоняет
+    # вакансии с момента прошлого (по времени последнего прогона).
+    agent_interval_minutes: int = 30
 
     @property
     def is_single_track(self) -> bool:
