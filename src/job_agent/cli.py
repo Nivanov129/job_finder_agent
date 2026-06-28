@@ -110,6 +110,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=10,
         help="Число корзин гистограммы распределения (дефолт 10)",
     )
+
+    ui = sub.add_parser(
+        "ui",
+        help="Открыть web-UI в нативном окне (опц., требует pywebview)",
+    )
+    ui.add_argument(
+        "--config",
+        default=None,
+        help="Путь к config.json для формы настройки (опц.)",
+    )
+    ui.add_argument("--host", default=None, help="Хост сервера (дефолт 127.0.0.1)")
+    ui.add_argument("--port", type=int, default=None, help="Порт сервера (дефолт 8765)")
     return parser
 
 
@@ -164,6 +176,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             serve(_run, at=at)
         else:
             _run()
+        return 0
+
+    if args.command == "ui":
+        # Импорт здесь, а не на верхнем уровне: web-UI/pywebview опциональны,
+        # ядро CLI работает без них.
+        from webui.native import launch
+
+        launch(config_path=args.config, host=args.host, port=args.port)
         return 0
 
     parser.error(f"неизвестная команда: {args.command}")  # pragma: no cover

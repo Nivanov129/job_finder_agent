@@ -17,6 +17,10 @@ dependencies = [
     "python-multipart>=0.0.9",
 ]
 
+[project.optional-dependencies]
+# Опц. нативная оболочка поверх web-UI (Task 6.1). Ядро/Docker headless без неё.
+native = ["pywebview>=5.0"]
+
 [project.scripts]
 job-agent = "job_agent.cli:main"
 
