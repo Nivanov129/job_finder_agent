@@ -214,9 +214,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 3.2: Контакт-ассист
-- [ ] `enrich/contacts.py` по `prompts/contact-search.md`, только при `enable_contacts`: web-поиск по булевым запросам → кандидаты + черновик, без отправки, парс строгого JSON.
-- [ ] Тест на фейках web-поиска и движка.
-- [ ] Mark completed
+- [x] `enrich/contacts.py` по `prompts/contact-search.md`, только при `enable_contacts`: web-поиск по булевым запросам → кандидаты + черновик, без отправки, парс строгого JSON.
+- [x] Тест на фейках web-поиска и движка.
+- [x] Mark completed
 
 ### Task 3.3: Включение обогащения в пайплайн
 - [ ] `pipeline.py`: после скоринга для финалистов выше порога — cover; при `enable_contacts` — contacts; результаты в оба выхлопа.
