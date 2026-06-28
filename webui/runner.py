@@ -62,9 +62,38 @@ class RunState:
     output: str = ""  # имя файла .xlsx для скачивания (когда готово)
 
 
-# (config_path, on_progress, agent_mode) -> счётчики прогона; бросает при ошибке.
+# (config_path, on_progress, on_result, agent_mode) -> счётчики; бросает при ошибке.
 ProgressFn = Callable[[str, dict[str, int]], None]
-BackfillFn = Callable[[Path, ProgressFn, bool], dict[str, Any]]
+ResultFn = Callable[[dict[str, Any]], None]
+BackfillFn = Callable[[Path, ProgressFn, ResultFn, bool], dict[str, Any]]
+
+
+def result_to_dict(er: Any) -> dict[str, Any]:
+    """Компактный вид обогащённого результата для UI (карточка/лента)."""
+    from job_agent.presentation import badge_band
+
+    s = er.score.scores
+    v = er.score.verdict
+    band = badge_band(s.overall)
+    gaps = er.score.gaps
+    gap = ""
+    for items in (gaps.critical, gaps.strategic, gaps.cosmetic):
+        if items:
+            gap = items[0]
+            break
+    return {
+        "role": er.vacancy.title,
+        "company": er.vacancy.company or "",
+        "track": er.score.track,
+        "resume": int(s.overall),
+        "map": int(s.map_fit),
+        "band": band,
+        "verdict": v.type,
+        "verdict_summary": v.summary or "",
+        "gap": gap,
+        "has_cover": bool(er.cover_letter),
+        "link": er.vacancy.link_or_contact or er.vacancy.url or "",
+    }
 
 
 class BackfillRunner:
@@ -73,6 +102,7 @@ class BackfillRunner:
     def __init__(self, *, run: BackfillFn | None = None) -> None:
         self._run = run or _default_run
         self._state = RunState()
+        self._results: list[dict[str, Any]] = []  # результаты текущего/последнего прогона
         self._lock = threading.Lock()
         # агент
         self._agent_stop = threading.Event()
@@ -97,10 +127,19 @@ class BackfillRunner:
             if self._state.status == "running":
                 return False
             self._state = RunState(status="running", message="прогон запущен…")
+            self._results = []  # новый прогон — сбрасываем результаты
         threading.Thread(
             target=self._worker, args=(Path(config_path), agent_mode), daemon=True
         ).start()
         return True
+
+    def results(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return list(self._results)
+
+    def _on_result(self, item: dict[str, Any]) -> None:
+        with self._lock:
+            self._results.append(item)
 
     def _on_progress(self, stage: str, counts: dict[str, int]) -> None:
         with self._lock:
@@ -113,7 +152,7 @@ class BackfillRunner:
 
     def _worker(self, config_path: Path, agent_mode: bool) -> None:
         try:
-            res = self._run(config_path, self._on_progress, agent_mode)
+            res = self._run(config_path, self._on_progress, self._on_result, agent_mode)
             new = RunState(status="done", message="готово")
             new.collected = int(res.get("collected", 0))
             new.after_filter = int(res.get("after_filter", 0))
@@ -161,7 +200,10 @@ class BackfillRunner:
 
 
 def _default_run(  # pragma: no cover - пайплайн
-    config_path: Path, on_progress: ProgressFn, agent_mode: bool = False
+    config_path: Path,
+    on_progress: ProgressFn,
+    on_result: ResultFn,
+    agent_mode: bool = False,
 ) -> dict[str, Any]:
     """Боевой прогон: грузит конфиг и гоняет пайплайн, пишет .xlsx рядом.
 
@@ -192,7 +234,9 @@ def _default_run(  # pragma: no cover - пайплайн
 
     out = base / "backfill.xlsx"
     result = run_pipeline(
-        config, since=since, base_dir=base, output_path=out, on_progress=on_progress
+        config, since=since, base_dir=base, output_path=out,
+        on_progress=on_progress,
+        on_result=lambda er: on_result(result_to_dict(er)),
     )
     write_last_run(last_run_file, now)
     return {

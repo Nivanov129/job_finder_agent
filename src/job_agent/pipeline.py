@@ -230,6 +230,7 @@ def run_pipeline(
     min_sim: float = DEFAULT_MIN_SIM,
     limit: int = DEFAULT_LIMIT,
     on_progress: Callable[[str, dict[str, int]], None] | None = None,
+    on_result: Callable[[EnrichedResult], None] | None = None,
 ) -> RunResult:
     """Прогнать стадии 1–5 + xlsx за один проход.
 
@@ -399,6 +400,11 @@ def run_pipeline(
             scored["n"] += 1
             _report("score", collected=collected, after_filter=after_filter,
                     scored=scored["n"])
+            if result is not None and on_result is not None:
+                try:
+                    on_result(result)
+                except Exception:  # pragma: no cover - стриминг не роняет прогон
+                    pass
             return result
 
         # Скоринг параллельно (ex.map сохраняет порядок); финалистов немного.

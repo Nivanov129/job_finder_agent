@@ -428,6 +428,11 @@ def create_app(
     def run_status() -> JSONResponse:
         return JSONResponse(runner.state())
 
+    @app.get("/run/results")
+    def run_results() -> JSONResponse:
+        # Результаты текущего/последнего прогона (наполняются по мере скоринга).
+        return JSONResponse({"results": runner.results()})
+
     @app.post("/agent/start")
     async def agent_start(request: Request) -> JSONResponse:
         form = await request.form()
