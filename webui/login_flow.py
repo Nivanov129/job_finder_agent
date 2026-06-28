@@ -55,6 +55,9 @@ _TOKEN_ENV_KEY: dict[str, str] = {"claude": "CLAUDE_CODE_OAUTH_TOKEN"}
 
 URL_RE = re.compile(r"https?://[^\s'\"<>]+")
 CLAUDE_TOKEN_RE = re.compile(r"sk-ant-oat[0-9A-Za-z_-]+")
+# Признак неудачного обмена кода (claude печатает это и ждёт «Press Enter to
+# retry», не завершаясь) — чтобы не висеть в ожидании токена 180с.
+LOGIN_ERROR_RE = re.compile(r"OAuth error|Press Enter to retry|status code [45]\d\d", re.I)
 # Одноразовый device-код codex, напр. «CVBJ-2XUDK».
 DEVICE_CODE_RE = re.compile(r"\b[A-Z0-9]{4,6}-[A-Z0-9]{4,6}\b")
 
@@ -257,10 +260,24 @@ class _PtyLogin:  # pragma: no cover - реальный процесс/PTY/IO
         import time
 
         if self._engine == "claude":
-            token = self._wait_for(CLAUDE_TOKEN_RE, timeout)
+            # Ждём токен ИЛИ признак ошибки обмена — иначе при неверном/истёкшем
+            # коде claude висит на «Press Enter to retry» и мы ждали бы весь таймаут.
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline:
+                token = self._scan(CLAUDE_TOKEN_RE)
+                if token:
+                    return LoginResult(True, "токен получен и сохранён", token=token)
+                if self._scan(LOGIN_ERROR_RE):
+                    return LoginResult(
+                        False, "код неверный или истёк — нажмите «Войти» и повторите"
+                    )
+                if self._proc.poll() is not None:
+                    break
+                time.sleep(0.3)
+            token = self._scan(CLAUDE_TOKEN_RE)
             if token:
                 return LoginResult(True, "токен получен и сохранён", token=token)
-            return LoginResult(False, "токен не получен — проверьте код и повторите")
+            return LoginResult(False, "токен не получен — нажмите «Войти» и повторите")
         # codex: ждём успешного выхода процесса (auth.json пишет сам)
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:

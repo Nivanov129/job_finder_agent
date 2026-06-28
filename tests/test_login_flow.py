@@ -80,6 +80,21 @@ def test_codex_device_mode_shows_code_no_token(tmp_path: Path) -> None:
     assert not env.exists() or "CLAUDE_CODE_OAUTH_TOKEN" not in parse_env(env)
 
 
+def test_submit_failure_writes_no_token(tmp_path: Path) -> None:
+    """Неверный/истёкший код: result(ok=False) → токен в .env не пишется."""
+
+    class _FailClaude(_FakeClaude):
+        def result(self, timeout: float) -> LoginResult:
+            return LoginResult(False, "код неверный или истёк")
+
+    env = tmp_path / ".env"
+    mgr = LoginManager(env, spawn=lambda e: _FailClaude())
+    mgr.start("claude")
+    res = mgr.submit("claude", "bad-code")
+    assert res["ok"] is False
+    assert not env.exists() or "CLAUDE_CODE_OAUTH_TOKEN" not in parse_env(env)
+
+
 def test_submit_without_start_errors(tmp_path: Path) -> None:
     mgr = LoginManager(tmp_path / ".env", spawn=_spawn)
     res = mgr.submit("claude", "x")
