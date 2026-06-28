@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://job-agent.local/config.schema.json",
+  "title": "Job Agent — конфиг участника",
+  "description": "Самодостаточный конфиг локального агента подбора вакансий. Модель направлений (tracks) — расширяемый список от 1 до N, заменяет захардкоженные «два пути».",
+  "type": "object",
+  "required": ["version", "tracks", "scoring_engine", "output_mode"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Версия схемы конфига."
+    },
+
+    "tracks": {
+      "type": "array",
+      "description": "Направления поиска. Минимум одно. Каждое самодостаточно: своё резюме, шаблон сопроводительного и рубрика. Кейс «одно направление» схлопывает UI и выхлоп (тег направления и колонка скрываются).",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/track" }
+    },
+
+    "search_map": {
+      "type": "object",
+      "description": "Общий якорь скоринга — примеры идеальных вакансий. Пример можно пометить track_id, тогда «карта %» считается против релевантного направления, а не всей кучи. Пример без track_id — общий, участвует во всех.",
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "description": "Файл примеров-идеалов (md/txt/json)." },
+        "examples": {
+          "type": "array",
+          "description": "Опц. структурированные примеры. Если задан path, можно оставить пустым.",
+          "items": {
+            "type": "object",
+            "required": ["text"],
+            "additionalProperties": false,
+            "properties": {
+              "text": { "type": "string", "description": "Текст/описание эталонной вакансии." },
+              "track_id": { "type": "string", "description": "Опц. привязка к направлению. Пусто = общий пример." }
+            }
+          }
+        }
+      }
+    },
+
+    "global_role_gate": {
+      "type": "array",
+      "description": "Допустимые роли по умолчанию (гейт пре-фильтра). Трек может переопределить своим role_gate. Пусто = без гейта по роли.",
+      "items": { "type": "string" }
+    },
+
+    "global_disqualifiers": {
+      "type": "string",
+      "description": "Общие красные флаги (дисквалификаторы). Применяются ко всем трекам; трек может дополнить своими."
+    },
+
+    "multi_track_scoring": {
+      "type": "boolean",
+      "default": false,
+      "description": "false (дефолт): скорим только против лучшего по близости трека (роутинг, дёшево). true: если топ-2 трека в пределах multi_track_delta — скорим против обоих, берём лучший (~1.3x токенов)."
+    },
+    "multi_track_delta": {
+      "type": "number",
+      "default": 0.05,
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Порог близости косинусов, при котором второй трек тоже идёт в скоринг (только если multi_track_scoring=true)."
+    },
+
+    "tg_channels": {
+      "type": "array",
+      "description": "Telegram-каналы. Публичные читаются через t.me/s/, приватные — через Telethon (нужны creds).",
+      "items": {
+        "type": "object",
+        "required": ["handle"],
+        "additionalProperties": false,
+        "properties": {
+          "handle": { "type": "string", "description": "Имя канала без @, напр. 'forhirejobs'." },
+          "private": { "type": "boolean", "default": false, "description": "true = приватный, читается через Telethon." }
+        }
+      }
+    },
+    "use_aggregators": {
+      "type": "boolean",
+      "default": true,
+      "description": "Включить агрегаторы vseti.app + getmatch."
+    },
+
+    "scoring_engine": {
+      "type": "string",
+      "enum": ["cli", "api_key", "ollama"],
+      "default": "cli",
+      "description": "Движок скоринга (BYO). cli — Claude Code/Codex на подписке (дефолт). api_key — Anthropic/OpenAI. ollama — локально."
+    },
+    "cli_tool": {
+      "type": "string",
+      "enum": ["claude", "codex"],
+      "description": "Если scoring_engine=cli: какой инструмент установлен."
+    },
+    "api_base_url": { "type": "string", "description": "Если scoring_engine=api_key." },
+    "api_key": { "type": "string", "description": "Если scoring_engine=api_key. Секрет, не логировать." },
+    "ollama_model": { "type": "string", "description": "Если scoring_engine=ollama, напр. 'llama3.1:70b'." },
+
+    "web_search": {
+      "type": "object",
+      "description": "Web-поиск для анализа компании и контакт-поиска.",
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "type": "string", "enum": ["searxng", "serp"], "default": "searxng" },
+        "url": { "type": "string", "description": "URL self-host SearXNG." },
+        "api_key": { "type": "string", "description": "Ключ SERP-провайдера. Секрет." }
+      }
+    },
+
+    "output_mode": {
+      "type": "string",
+      "enum": ["table", "bot", "both"],
+      "default": "both",
+      "description": "Куда выгружать: .xlsx / Telegram-бот / оба."
+    },
+    "backfill_days": {
+      "type": "integer",
+      "default": 14,
+      "minimum": 1,
+      "description": "Глубина первого (исторического) прогона в днях."
+    },
+    "cover_letter_threshold": {
+      "type": "integer",
+      "default": 70,
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Мин. overall %, при котором генерится сопроводительное (правка шаблона трека)."
+    },
+    "output_lang": {
+      "type": "string",
+      "enum": ["ru", "en"],
+      "default": "ru",
+      "description": "Язык выхлопа (таблица, карточки, сопроводительное)."
+    },
+    "bot_token": { "type": "string", "description": "Если output_mode включает bot. Секрет." },
+    "telethon_creds": {
+      "type": "object",
+      "description": "Если есть приватные каналы.",
+      "additionalProperties": false,
+      "properties": {
+        "api_id": { "type": "string" },
+        "api_hash": { "type": "string" },
+        "session": { "type": "string", "description": "Строка сессии Telethon. Секрет." }
+      }
+    },
+    "enable_contacts": {
+      "type": "boolean",
+      "default": false,
+      "description": "Контакт-ассист: найти контакт + черновик обращения. Отправки нет."
+    }
+  },
+
+  "$defs": {
+    "track": {
+      "type": "object",
+      "description": "Одно направление поиска.",
+      "required": ["id", "name", "resume_path"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]+$",
+          "description": "Машинный идентификатор (латиница/цифры/-/_). Используется для привязки примеров карты и в логах."
+        },
+        "name": {
+          "type": "string",
+          "description": "Человеческий ярлык от пользователя ('Скейлап', 'Backend', что угодно). Идёт в выхлоп как 'направление'."
+        },
+        "resume_path": {
+          "type": "string",
+          "description": "Резюме под это направление (upload)."
+        },
+        "cover_template_path": {
+          "type": "string",
+          "description": "Опц. пример сопроводительного под это направление. Без него сопроводительное для трека не генерится."
+        },
+        "rubric": {
+          "type": "string",
+          "description": "«Что для меня = попадание» по этому направлению. Свободный текст, используется в скоринге и в карте."
+        },
+        "role_gate": {
+          "type": "array",
+          "description": "Опц. допустимые роли для этого трека. Переопределяет global_role_gate. Пусто = наследует глобальный.",
+          "items": { "type": "string" }
+        },
+        "disqualifiers": {
+          "type": "string",
+          "description": "Опц. дисквалификаторы, специфичные для трека. Дополняют global_disqualifiers."
+        }
+      }
+    }
+  }
+}

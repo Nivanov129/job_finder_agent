@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job agent — прототип</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<style>
+  :root{
+    --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --surface-0:#f5f4ef; --surface-1:#faf9f5; --surface-2:#ffffff;
+    --text-primary:#1a1a18; --text-secondary:#5f5e5a; --text-muted:#8a8980;
+    --border:rgba(0,0,0,.10); --border-strong:rgba(0,0,0,.18);
+    --text-accent:#185FA5; --bg-accent:#E6F1FB; --border-accent:#378ADD;
+    --fill-accent:#2B7FD4; --on-accent:#ffffff;
+    --text-warning:#854F0B; --bg-warning:#FAEEDA; --border-warning:#EF9F27;
+    --text-success:#3B6D11; --radius:8px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--surface-0);font-family:var(--font-sans);color:var(--text-primary);padding:28px 16px 60px;line-height:1.5}
+  .page{max-width:720px;margin:0 auto}
+  h1{font-size:22px;font-weight:500;margin:0 0 4px}
+  .sub{font-size:14px;color:var(--text-muted);margin:0 0 28px}
+  .screen-label{font-size:13px;color:var(--text-muted);text-transform:none;margin:26px 0 12px;padding-bottom:6px;border-bottom:0.5px solid var(--border)}
+  button{font-family:inherit;font-size:14px;color:var(--text-primary);background:var(--surface-2);border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:7px 13px;cursor:pointer;transition:background .15s,transform .05s}
+  button:hover{background:var(--surface-1)}
+  button:active{transform:scale(.98)}
+  textarea{font-family:var(--font-sans);color:var(--text-primary);background:var(--surface-2);border:0.5px solid var(--border);border-radius:var(--radius);padding:8px 10px}
+  textarea:focus{outline:none;border-color:var(--border-accent);box-shadow:0 0 0 1px var(--border-accent)}
+  input[type=range]{-webkit-appearance:none;appearance:none;height:4px;background:var(--border-strong);border-radius:2px}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--surface-2);border:0.5px solid var(--border-strong);cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--surface-2);border:0.5px solid var(--border-strong);cursor:pointer}
+  .eng{transition:border-color .12s}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Job agent — прототип</h1>
+  <p class="sub">данные-заглушки · светлая тема · два экрана</p>
+
+  <div class="screen-label">Экран 1 · настройка</div>
+
+  <div style="font-family:var(--font-sans);">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:34px;height:34px;border-radius:8px;background:var(--bg-accent);display:flex;align-items:center;justify-content:center;color:var(--text-accent);"><i class="ti ti-radar-2" style="font-size:19px" aria-hidden="true"></i></div>
+      <div>
+        <div style="font-size:18px;font-weight:500;color:var(--text-primary);">Job agent · настройка</div>
+        <div style="font-size:13px;color:var(--text-muted);">локально на вашем компьютере</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;align-items:flex-start;background:var(--bg-warning);border:0.5px solid var(--border-warning);border-radius:8px;padding:10px 12px;margin:14px 0 18px;">
+      <i class="ti ti-alert-triangle" style="font-size:18px;color:var(--text-warning);margin-top:1px" aria-hidden="true"></i>
+      <div style="font-size:13px;color:var(--text-warning);line-height:1.5;">Для реалтайм-мониторинга компьютер должен быть включён. «Таблица за период» запускается по требованию.</div>
+    </div>
+
+    <div style="background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><i class="ti ti-user" style="font-size:18px;color:var(--text-secondary)" aria-hidden="true"></i><span style="font-size:16px;font-weight:500;color:var(--text-primary);">Профиль · под два пути</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:12px;">
+        <div style="border:0.5px solid var(--border);border-radius:10px;padding:12px;">
+          <span style="font-size:12px;background:#EEEDFE;color:#3C3489;border-radius:6px;padding:2px 8px;">Скейлап</span>
+          <div style="display:flex;align-items:center;gap:8px;border:0.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:10px;">
+            <i class="ti ti-file-cv" style="font-size:16px;color:var(--text-success)" aria-hidden="true"></i>
+            <span style="font-size:13px;color:var(--text-primary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Ivanov-CV.pdf</span>
+            <i class="ti ti-check" style="font-size:15px;color:var(--text-success)" aria-hidden="true"></i>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;border:0.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:8px;">
+            <i class="ti ti-mail" style="font-size:16px;color:var(--text-muted)" aria-hidden="true"></i>
+            <span style="font-size:13px;color:var(--text-secondary);flex:1;">Сопроводительное · пример</span>
+            <span style="font-size:12px;color:var(--text-accent);">загрузить</span>
+          </div>
+        </div>
+        <div style="border:0.5px solid var(--border);border-radius:10px;padding:12px;">
+          <span style="font-size:12px;background:#EEEDFE;color:#3C3489;border-radius:6px;padding:2px 8px;">AI-first</span>
+          <div style="display:flex;align-items:center;gap:8px;border:0.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:10px;">
+            <i class="ti ti-file-text" style="font-size:16px;color:var(--text-muted)" aria-hidden="true"></i>
+            <span style="font-size:13px;color:var(--text-secondary);flex:1;">Резюме · путь AI</span>
+            <span style="font-size:12px;color:var(--text-accent);">загрузить</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;border:0.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:8px;">
+            <i class="ti ti-mail" style="font-size:16px;color:var(--text-muted)" aria-hidden="true"></i>
+            <span style="font-size:13px;color:var(--text-secondary);flex:1;">Сопроводительное · пример</span>
+            <span style="font-size:12px;color:var(--text-accent);">загрузить</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;border:1px dashed var(--border-strong);border-radius:8px;padding:10px 12px;margin-top:12px;">
+        <i class="ti ti-map-2" style="font-size:18px;color:var(--text-secondary)" aria-hidden="true"></i>
+        <div style="flex:1;">
+          <div style="font-size:13px;color:var(--text-primary);">Карта поиска · общая</div>
+          <div style="font-size:12px;color:var(--text-muted);">файл с примерами идеальных вакансий — якоря для скоринга</div>
+        </div>
+        <span style="font-size:12px;color:var(--text-accent);">загрузить</span>
+      </div>
+    </div>
+
+    <div style="background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><i class="ti ti-rss" style="font-size:18px;color:var(--text-secondary)" aria-hidden="true"></i><span style="font-size:16px;font-weight:500;color:var(--text-primary);">Источники</span></div>
+      <textarea rows="2" placeholder="@ml_jobs&#10;@ai_startups_hiring" style="width:100%;font-size:13px;resize:vertical;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+        <span style="display:inline-flex;align-items:center;gap:5px;font-size:13px;background:var(--bg-accent);color:var(--text-accent);border-radius:16px;padding:4px 11px;"><i class="ti ti-check" style="font-size:14px" aria-hidden="true"></i>vseti.app</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;font-size:13px;background:var(--bg-accent);color:var(--text-accent);border-radius:16px;padding:4px 11px;"><i class="ti ti-check" style="font-size:14px" aria-hidden="true"></i>getmatch</span>
+      </div>
+    </div>
+
+    <div style="background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><i class="ti ti-cpu" style="font-size:18px;color:var(--text-secondary)" aria-hidden="true"></i><span style="font-size:16px;font-weight:500;color:var(--text-primary);">Движок AI</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">
+        <div class="eng" data-sel="1" style="border:2px solid var(--border-accent);border-radius:10px;padding:11px;cursor:pointer;position:relative;">
+          <span style="position:absolute;top:9px;right:9px;font-size:11px;background:var(--bg-accent);color:var(--text-accent);border-radius:6px;padding:2px 6px;">дефолт</span>
+          <i class="ti ti-terminal-2" style="font-size:19px;color:var(--text-primary)" aria-hidden="true"></i>
+          <div style="font-size:14px;font-weight:500;margin-top:6px;color:var(--text-primary);">CLI на подписке</div>
+          <div style="font-size:12px;color:var(--text-muted);">Claude Code / Codex</div>
+        </div>
+        <div class="eng" data-sel="0" style="border:0.5px solid var(--border);border-radius:10px;padding:11px;cursor:pointer;">
+          <i class="ti ti-key" style="font-size:19px;color:var(--text-secondary)" aria-hidden="true"></i>
+          <div style="font-size:14px;font-weight:500;margin-top:6px;color:var(--text-primary);">Свой ключ</div>
+          <div style="font-size:12px;color:var(--text-muted);">Anthropic / OpenAI</div>
+        </div>
+        <div class="eng" data-sel="0" style="border:0.5px solid var(--border);border-radius:10px;padding:11px;cursor:pointer;">
+          <i class="ti ti-server" style="font-size:19px;color:var(--text-secondary)" aria-hidden="true"></i>
+          <div style="font-size:14px;font-weight:500;margin-top:6px;color:var(--text-primary);">Ollama</div>
+          <div style="font-size:12px;color:var(--text-muted);">локально</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:18px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><i class="ti ti-arrow-bar-to-down" style="font-size:18px;color:var(--text-secondary)" aria-hidden="true"></i><span style="font-size:16px;font-weight:500;color:var(--text-primary);">Выхлоп</span></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;background:var(--bg-accent);color:var(--text-accent);border-radius:8px;padding:7px 12px;"><i class="ti ti-table" style="font-size:16px" aria-hidden="true"></i>Таблица .xlsx</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;background:var(--bg-accent);color:var(--text-accent);border-radius:8px;padding:7px 12px;"><i class="ti ti-brand-telegram" style="font-size:16px" aria-hidden="true"></i>Telegram-бот</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <label style="font-size:13px;color:var(--text-secondary);min-width:210px;">Сопроводительное — порог</label>
+        <input type="range" id="thr" min="0" max="100" step="5" value="70" style="flex:1;">
+        <span id="thrv" style="font-size:13px;font-weight:500;min-width:34px;text-align:right;color:var(--text-primary);">70%</span>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);">Письмо генерим только для вакансий выше порога.</div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button>Сохранить</button>
+      <button style="background:var(--fill-accent);color:var(--on-accent);border-color:var(--fill-accent);">Запустить backfill</button>
+    </div>
+  </div>
+
+  <div class="screen-label">Экран 2 · подборка</div>
+
+  <div style="font-family:var(--font-sans);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div>
+        <div style="font-size:16px;font-weight:500;color:var(--text-primary);">Подборка · 28 июня</div>
+        <div style="font-size:13px;color:var(--text-muted);">собрано 18 · после фильтра 6 · показаны топ-3</div>
+      </div>
+      <button style="font-size:13px;display:inline-flex;align-items:center;gap:6px;"><i class="ti ti-download" style="font-size:16px" aria-hidden="true"></i>Скачать .xlsx</button>
+    </div>
+
+    <div style="background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+        <div>
+          <div style="font-size:15px;font-weight:500;color:var(--text-primary);">Head of AI</div>
+          <div style="font-size:13px;color:var(--text-secondary);">Aviata · Series B · удалённо</div>
+          <span style="display:inline-block;font-size:11px;background:#EEEDFE;color:#3C3489;border-radius:6px;padding:2px 7px;margin-top:6px;">AI-first</span>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">резюме</div>
+          <span style="font-size:14px;font-weight:500;background:#EAF3DE;color:#27500A;border-radius:8px;padding:3px 9px;">86%</span>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:7px;"><i class="ti ti-map-2" style="font-size:13px;vertical-align:-2px;margin-right:3px" aria-hidden="true"></i>карта 91%</div>
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--text-primary);margin:10px 0 4px;line-height:1.5;"><i class="ti ti-circle-check" style="font-size:15px;color:var(--text-success);vertical-align:-2px;margin-right:5px" aria-hidden="true"></i>Точное попадание · откликаться</div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.5;">Гэп: английский B2+ как must. Акцент в письме — production-RAG и владение метриками.</div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <button style="font-size:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-external-link" style="font-size:14px" aria-hidden="true"></i>Открыть</button>
+        <button style="font-size:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-copy" style="font-size:14px" aria-hidden="true"></i>Сопроводительное</button>
+        <button style="font-size:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-user-search" style="font-size:14px" aria-hidden="true"></i>Контакт + обращение</button>
+      </div>
+    </div>
+
+    <div style="background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+        <div>
+          <div style="font-size:15px;font-weight:500;color:var(--text-primary);">Senior Product Manager</div>
+          <div style="font-size:13px;color:var(--text-secondary);">SkySend · scaleup · гибрид</div>
+          <span style="display:inline-block;font-size:11px;background:#EEEDFE;color:#3C3489;border-radius:6px;padding:2px 7px;margin-top:6px;">Скейлап</span>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">резюме</div>
+          <span style="font-size:14px;font-weight:500;background:#FAEEDA;color:#633806;border-radius:8px;padding:3px 9px;">72%</span>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:7px;"><i class="ti ti-map-2" style="font-size:13px;vertical-align:-2px;margin-right:3px" aria-hidden="true"></i>карта 68%</div>
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--text-primary);margin:10px 0 4px;line-height:1.5;"><i class="ti ti-arrow-up-right" style="font-size:15px;color:var(--text-warning);vertical-align:-2px;margin-right:5px" aria-hidden="true"></i>Stretch · стоит откликнуться</div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.5;">Гэп: меньше людей в подчинении. Зеркалить «владение продуктовыми метриками».</div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <button style="font-size:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-external-link" style="font-size:14px" aria-hidden="true"></i>Открыть</button>
+        <button style="font-size:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-copy" style="font-size:14px" aria-hidden="true"></i>Сопроводительное</button>
+        <button style="font-size:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-user-search" style="font-size:14px" aria-hidden="true"></i>Контакт + обращение</button>
+      </div>
+    </div>
+
+    <div style="background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:14px 16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+        <div>
+          <div style="font-size:15px;font-weight:500;color:var(--text-primary);">Product Lead, ML Platform</div>
+          <div style="font-size:13px;color:var(--text-secondary);">Tortuga · корпорация · офис</div>
+          <span style="display:inline-block;font-size:11px;background:#EEEDFE;color:#3C3489;border-radius:6px;padding:2px 7px;margin-top:6px;">Скейлап</span>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">резюме</div>
+          <span style="font-size:14px;font-weight:500;background:#F1EFE8;color:#444441;border-radius:8px;padding:3px 9px;">64%</span>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:7px;"><i class="ti ti-map-2" style="font-size:13px;vertical-align:-2px;margin-right:3px" aria-hidden="true"></i>карта 52%</div>
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--text-primary);margin:10px 0 4px;line-height:1.5;"><i class="ti ti-minus" style="font-size:15px;color:var(--text-muted);vertical-align:-2px;margin-right:5px" aria-hidden="true"></i>На грани · решать по приоритету</div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.5;">Ниже порога сопроводительного (70%) — письмо не сгенерировано.</div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <button style="font-size:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-external-link" style="font-size:14px" aria-hidden="true"></i>Открыть</button>
+        <button style="font-size:12px;display:inline-flex;align-items:center;gap:5px;"><i class="ti ti-user-search" style="font-size:14px" aria-hidden="true"></i>Контакт + обращение</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var thr=document.getElementById('thr'),thrv=document.getElementById('thrv');
+  if(thr)thr.addEventListener('input',function(){thrv.textContent=Math.round(thr.value)+'%';});
+  document.querySelectorAll('.eng').forEach(function(c){
+    c.addEventListener('click',function(){
+      document.querySelectorAll('.eng').forEach(function(x){
+        x.style.border='0.5px solid var(--border)';
+        x.querySelectorAll('i')[0].style.color='var(--text-secondary)';
+      });
+      c.style.border='2px solid var(--border-accent)';
+      c.querySelectorAll('i')[0].style.color='var(--text-primary)';
+    });
+  });
+})();
+</script>
+</body>
+</html>

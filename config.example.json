@@ -1,0 +1,68 @@
+{
+  "version": 1,
+
+  "tracks": [
+    {
+      "id": "scaleup",
+      "name": "Скейлап",
+      "resume_path": "./resumes/scaleup.pdf",
+      "cover_template_path": "./cover-templates/default.md",
+      "rubric": "Рабочая лошадка. Технический PM или Head/Lead в CIS-скейлапе или продуктовом юните. Продукт с реальными метриками и владением ими (а не косвенным влиянием). Не корпорат-бюрократия. Масштаб, где mobile + technical работает рычагом. Стадия, где решения двигают метрику, а не согласуются полгода.",
+      "role_gate": ["Product Manager", "Technical PM", "Head of Product", "Product Lead"],
+      "disqualifiers": "Корпорат без владения метриками; чисто процессная роль без билдерской части."
+    },
+    {
+      "id": "ai-first",
+      "name": "AI-first",
+      "resume_path": "./resumes/ai-first.pdf",
+      "cover_template_path": "./cover-templates/default.md",
+      "rubric": "Амбиция. Head of Product / Head of AI / AI PM. Компания AI-first, Series A–C. AI как ядро продукта, а не маркетинговая фича. Стадия, где можно строить с нуля и владеть направлением. Сильный сигнал — реальные ML/AI-метрики и инфраструктура, а не обёртка над чужим API в лендинге.",
+      "role_gate": ["Head of Product", "Head of AI", "AI Product Manager", "Product Lead"],
+      "disqualifiers": "«AI» только в маркетинге вакансии или в названии без продуктовой сути; роль без возможности строить."
+    }
+  ],
+
+  "search_map": {
+    "path": "./search-map.md",
+    "examples": [
+      {
+        "track_id": "scaleup",
+        "text": "Technical PM, продуктовый юнит финтех-скейлапа, 200+ человек, владение retention/activation, mobile-first, прямой доступ к данным и эксперименты без долгих согласований."
+      },
+      {
+        "track_id": "ai-first",
+        "text": "Head of AI Product, Series B, продукт построен вокруг собственных моделей, команда из ML-инженеров, задача — стратегия и метрики качества генерации, а не интеграция готового LLM."
+      },
+      {
+        "text": "Любая роль с прямым владением P&L или северной метрикой продукта и коротким циклом обратной связи — общий эталон по обоим направлениям."
+      }
+    ]
+  },
+
+  "global_role_gate": ["Product Manager", "Head of Product", "Product Lead", "Head of AI"],
+  "global_disqualifiers": "Корпоративная бюрократия без владения метриками. Роль, где продукт = бэклог чужих решений. Аутстафф/аутсорс без собственного продукта.",
+
+  "multi_track_scoring": false,
+  "multi_track_delta": 0.05,
+
+  "tg_channels": [
+    { "handle": "forhirejobs", "private": false },
+    { "handle": "product_jobs", "private": false }
+  ],
+  "use_aggregators": true,
+
+  "scoring_engine": "cli",
+  "cli_tool": "claude",
+
+  "web_search": {
+    "provider": "searxng",
+    "url": "http://localhost:8080"
+  },
+
+  "output_mode": "both",
+  "backfill_days": 14,
+  "cover_letter_threshold": 70,
+  "output_lang": "ru",
+
+  "enable_contacts": false
+}
