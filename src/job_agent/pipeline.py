@@ -200,10 +200,18 @@ def run_pipeline(
     own_store = seen_store is None
     store = seen_store or SeenStore()
     try:
-        # 1. Сбор.
+        # 1. Сбор. Источники изолированы: поломка одного адаптера (сменилась
+        # вёрстка/API, сеть) логируется и не валит прогон — собираем по остальным.
         posts = []
         for collector in collectors:
-            posts.extend(collector.fetch(since))
+            try:
+                posts.extend(collector.fetch(since))
+            except Exception as exc:
+                logger.warning(
+                    "источник %s пропущен: %s",
+                    type(collector).__name__,
+                    exc,
+                )
         collected = len(posts)
 
         # 2. Нормализация.

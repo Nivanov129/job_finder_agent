@@ -172,6 +172,33 @@ def test_end_to_end_produces_valid_xlsx(tmp_path) -> None:
     assert ws.max_row == result.written + 1
 
 
+def test_collector_failure_is_isolated(tmp_path, caplog) -> None:
+    # Поломка одного источника (напр. getmatch 404) не валит прогон — собираем
+    # по остальным (инвариант: адаптеры изолированы).
+    config = _config(tmp_path, single_track=True)
+    engine = StubEngine(config.tracks[0].name)
+
+    class _Boom:
+        def fetch(self, since):
+            raise RuntimeError("getmatch 404")
+
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        result = run_pipeline(
+            config,
+            since=FAR_PAST,
+            base_dir=tmp_path,
+            engine=engine,
+            embedder=_embedder(),
+            collectors=[_Boom(), *_collectors(config)],
+            seen_store=SeenStore(":memory:"),
+        )
+
+    assert result.collected > 0  # упавший источник пропущен, остальные собрались
+    assert any("пропущен" in r.message for r in caplog.records)
+
+
 def test_single_track_hides_direction_column(tmp_path) -> None:
     config = _config(tmp_path, single_track=True)
     engine = StubEngine(config.tracks[0].name)
