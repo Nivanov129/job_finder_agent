@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -39,6 +40,8 @@ class PrivateMessage:
 # (handle, since) -> сообщения канала. Дефолт ходит в сеть через telethon;
 # в тестах подменяется фейком.
 MessageFetcher = Callable[[str, datetime], list[PrivateMessage]]
+
+_logger = logging.getLogger("job_agent.collectors.telegram_private")
 
 
 def _as_aware(dt: datetime) -> datetime:
@@ -166,7 +169,12 @@ class TelegramPrivateCollector(Collector):
         fetcher = self._resolve_fetcher()
         out: list[RawPost] = []
         for handle in self._handles:
-            out.extend(build_posts(fetcher(handle, since), handle, since))
+            # Изоляция по каналу: один нерезолвимый/приватный хэндл (напр. голый
+            # numeric-id без username) не должен ронять сбор по остальным.
+            try:
+                out.extend(build_posts(fetcher(handle, since), handle, since))
+            except Exception as exc:
+                _logger.warning("канал %s пропущен: %s", handle, exc)
         return out
 
 

@@ -128,7 +128,7 @@ def create_app(
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
         return page(
-            render_settings(),
+            render_settings(_load_raw(target)),
             scripts='<script src="/static/js/settings.js"></script>',
             active="/",
         )
@@ -264,6 +264,12 @@ def create_app(
     async def save(request: Request) -> HTMLResponse:
         form = await request.form()
         data = config_from_form(form)
+        # Сохранить приватные каналы из Telegram (их форма Настройки не несёт),
+        # чтобы сохранение Настройки их не затирало.
+        existing_private = [
+            c for c in _load_raw(target).get("tg_channels", []) if c.get("private")
+        ]
+        data["tg_channels"] = data.get("tg_channels", []) + existing_private
         try:
             # Мерж: Настройка не несёт полей движка — берём их из текущего
             # конфига; при первом сохранении проставляем дефолтный движок.
@@ -293,11 +299,18 @@ def create_app(
     @app.get("/telegram", response_class=HTMLResponse)
     def telegram_page() -> str:
         env = {**os.environ, **parse_env(envfile)}
+        cfg = _load_raw(target)
+        saved = [
+            c.get("handle", "")
+            for c in cfg.get("tg_channels", [])
+            if c.get("private")
+        ]
         return page(
             render_telegram(
                 has_api_id=env.get("TELEGRAM_API_ID", ""),
                 has_api_hash=bool(env.get("TELEGRAM_API_HASH")),
                 has_session=bool(env.get("TELEGRAM_SESSION")),
+                saved=saved,
             ),
             scripts='<script src="/static/js/telegram.js"></script>',
             active="/telegram",
@@ -353,8 +366,13 @@ def create_app(
     async def telegram_save(request: Request) -> HTMLResponse:
         form = await request.form()
         handles = [h for h in form.getlist("channel") if str(h).strip()]
+        # Сохранить публичные каналы из Настройки, чтобы не затереть их.
+        existing_public = [
+            c for c in _load_raw(target).get("tg_channels", []) if not c.get("private")
+        ]
         updates = {
             "tg_channels": [{"handle": str(h), "private": True} for h in handles]
+            + existing_public
         }
         try:
             _merge_and_validate(updates, target)

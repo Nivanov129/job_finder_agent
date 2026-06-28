@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from html.parser import HTMLParser
@@ -16,6 +17,8 @@ from ..models import RawPost
 from .base import Collector
 
 __all__ = ["TelegramPublicCollector", "parse_tme_html", "HtmlFetcher"]
+
+_logger = logging.getLogger("job_agent.collectors.telegram_public")
 
 # url -> HTML страницы. Дефолт ходит в сеть; в тестах подменяется фейком.
 HtmlFetcher = Callable[[str], str]
@@ -161,7 +164,12 @@ class TelegramPublicCollector(Collector):
         since_aware = _as_aware(since)
         out: list[RawPost] = []
         for handle in self._handles:
-            html = self._fetch_html(f"https://t.me/s/{handle}")
+            # Изоляция по каналу: недоступный канал/превью не валит остальные.
+            try:
+                html = self._fetch_html(f"https://t.me/s/{handle}")
+            except Exception as exc:
+                _logger.warning("канал %s пропущен: %s", handle, exc)
+                continue
             for post in parse_tme_html(html, handle):
                 if post.date is not None and _as_aware(post.date) < since_aware:
                     continue

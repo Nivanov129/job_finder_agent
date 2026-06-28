@@ -206,12 +206,17 @@ class TelegramLogin:  # pragma: no cover - async Telethon / реальная с�
                     if not getattr(dialog, "is_channel", False):
                         continue
                     ent = dialog.entity
+                    username = getattr(ent, "username", None)
+                    # Только каналы с username — их надёжно резолвит сбор; каналы
+                    # без публичного имени по голому id Telethon не открывает.
+                    if not username:
+                        continue
                     if getattr(ent, "broadcast", False) or getattr(ent, "megagroup", False):
                         out.append(
                             {
-                                "id": getattr(ent, "username", None) or str(ent.id),
+                                "id": username,
                                 "title": getattr(ent, "title", "") or "",
-                                "username": getattr(ent, "username", None),
+                                "username": username,
                             }
                         )
             finally:

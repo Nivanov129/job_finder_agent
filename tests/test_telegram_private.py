@@ -56,6 +56,21 @@ def test_fetch_aggregates_handles_and_strips_prefix() -> None:
     }
 
 
+def test_fetch_isolates_failing_channel() -> None:
+    # Нерезолвимый канал (напр. numeric-id) не валит сбор по остальным.
+    def fetcher(handle: str, since: datetime) -> list[PrivateMessage]:
+        if handle == "1509092671":
+            raise ValueError("Cannot find any entity")
+        return _fake_fetcher(handle, since)
+
+    collector = TelegramPrivateCollector(
+        ["alphajobs", "1509092671", "betajobs"], fetcher=fetcher
+    )
+    posts = collector.fetch(datetime(2024, 1, 1, tzinfo=UTC))
+    sources = {p.source for p in posts}
+    assert sources == {"tg:alphajobs", "tg:betajobs"}  # битый канал пропущен
+
+
 def test_fetch_filters_by_since() -> None:
     collector = TelegramPrivateCollector(["alphajobs"], fetcher=_fake_fetcher)
     posts = collector.fetch(datetime(2024, 6, 15, tzinfo=UTC))

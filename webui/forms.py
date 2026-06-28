@@ -124,6 +124,11 @@ def config_from_form(form: FormLike) -> dict[str, Any]:
     # Движок AI и web-поиск — на отдельной странице (engine_config_from_form),
     # сюда не входят: сохранение Настройки мержится в конфиг, не трогая движок.
 
+    # Глубина backfill (дней) — управляется на форме.
+    days = _clean(form.get("backfill_days", ""))
+    if days.isdigit() and int(days) > 0:
+        data["backfill_days"] = int(days)
+
     # Выхлоп и пороги.
     threshold = _clean(form.get("cover_threshold", ""))
     if threshold:

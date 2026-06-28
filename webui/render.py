@@ -56,7 +56,8 @@ def _warning() -> str:
 
 
 def path_field(
-    *, name: str, label_html: str, placeholder: str, kind: str, accept: str = ""
+    *, name: str, label_html: str, placeholder: str, kind: str, accept: str = "",
+    value: str = "",
 ) -> str:
     """Поле-путь к файлу с кнопкой «Загрузить» рядом.
 
@@ -72,7 +73,8 @@ def path_field(
         + label_html
         + "</span>"
         '<div class="path-input">'
-        f'<input class="input" name="{name}" placeholder="{placeholder}">'
+        f'<input class="input" name="{name}" placeholder="{placeholder}" '
+        f'value="{escape(value)}">'
         f'<button type="button" class="btn btn--ghost file-upload" data-kind="{kind}">'
         f'{icon("ti-upload")} Загрузить</button>'
         f'<input type="file" class="file-upload__input" hidden{acc}>'
@@ -82,11 +84,14 @@ def path_field(
     )
 
 
-def track_card(*, removable: bool = True) -> str:
+def track_card(
+    *, removable: bool = True, name: str = "", resume: str = "",
+    template: str = "", roles: str = "",
+) -> str:
     """Одна повторяемая карточка направления (имя · резюме · шаблон · роли).
 
-    Используется и для серверного рендера первой карточки, и как тело `<template>`
-    для клонирования по «+ добавить направление».
+    Используется и для серверного рендера карточек (с подстановкой сохранённых
+    значений), и как тело `<template>` для клонирования по «+ добавить».
     """
     remove = (
         f'<button type="button" class="btn-icon track-remove" '
@@ -101,13 +106,15 @@ def track_card(*, removable: bool = True) -> str:
         f"{remove}"
         "</div>"
         '<label class="field"><span class="field__label">Имя направления</span>'
-        '<input class="input" name="track_name" placeholder="напр. Backend"></label>'
+        f'<input class="input" name="track_name" placeholder="напр. Backend" '
+        f'value="{escape(name)}"></label>'
         + path_field(
             name="track_resume",
             label_html=f'{icon("ti-file-cv")} Резюме (путь к файлу)',
             placeholder="./resumes/backend.pdf",
             kind="resume",
             accept=".pdf,.txt,.md",
+            value=resume,
         )
         + path_field(
             name="track_template",
@@ -115,17 +122,19 @@ def track_card(*, removable: bool = True) -> str:
             placeholder="./cover-templates/default.pdf",
             kind="template",
             accept=".pdf,.txt,.md",
+            value=template,
         )
         +
         '<label class="field"><span class="field__label">Допустимые роли (опц., '
         'через запятую)</span>'
-        '<input class="input" name="track_roles" '
-        'placeholder="Product Manager, Head of Product"></label>'
+        f'<input class="input" name="track_roles" '
+        f'placeholder="Product Manager, Head of Product" value="{escape(roles)}">'
+        "</label>"
         "</div>"
     )
 
 
-def _profile_card() -> str:
+def _profile_card(tracks: list[dict] | None = None, search_map_path: str = "") -> str:
     # Заголовок «Профиль» (без «под два пути» — устаревшая модель прототипа).
     tpl = (
         '<template id="track-template">' + track_card(removable=True) + "</template>"
@@ -138,15 +147,29 @@ def _profile_card() -> str:
             placeholder="./search-map.md — примеры идеальных вакансий",
             kind="search_map",
             accept=".pdf,.md,.txt,.json",
+            value=search_map_path,
         )
         + "</div>"
     )
+    if tracks:
+        cards = "".join(
+            track_card(
+                removable=True,
+                name=str(t.get("name", "")),
+                resume=str(t.get("resume_path", "")),
+                template=str(t.get("cover_template_path", "") or ""),
+                roles=", ".join(t.get("role_gate", []) or []),
+            )
+            for t in tracks
+        )
+    else:
+        cards = track_card(removable=True)
     return (
         '<section class="card">'
         f'<div class="card__title">{icon("ti-user")} Профиль</div>'
         '<div class="card__meta">Одно или несколько направлений. Каждое '
         "самодостаточно: своё резюме и шаблон.</div>"
-        '<div id="tracks-list" class="tracks-grid">' + track_card(removable=True) + "</div>"
+        '<div id="tracks-list" class="tracks-grid">' + cards + "</div>"
         '<button type="button" class="btn btn--ghost" id="add-track">'
         f'{icon("ti-plus")} Добавить направление</button>'
         + search_map
@@ -155,18 +178,31 @@ def _profile_card() -> str:
     )
 
 
-def _sources_card() -> str:
+def _sources_card(
+    channels: str = "", use_aggregators: bool = True, private_count: int = 0
+) -> str:
+    agg = " checked" if use_aggregators else ""
+    chip_cls = "chip chip--on" if use_aggregators else "chip"
+    tg_note = (
+        f'<div class="card__meta">Приватные каналы из твоего Telegram: '
+        f"<b>{private_count}</b> — управляются на странице "
+        f'<a href="/telegram">Telegram</a>.</div>'
+        if private_count
+        else '<div class="card__meta">Приватные каналы — на странице '
+        '<a href="/telegram">Telegram</a> (вход в аккаунт + авто-подбор).</div>'
+    )
     return (
         '<section class="card">'
         f'<div class="card__title">{icon("ti-rss")} Источники</div>'
-        '<label class="field"><span class="field__label">Telegram-каналы '
+        '<label class="field"><span class="field__label">Публичные Telegram-каналы '
         "(по одному в строке)</span>"
         '<textarea class="input" name="channels" rows="3" '
-        'placeholder="@ml_jobs&#10;@product_jobs"></textarea></label>'
-        '<div class="field__label">Агрегаторы</div>'
-        '<label class="chip-toggle"><input type="checkbox" name="use_aggregators" checked>'
-        f'<span class="chip chip--on">{icon("ti-rss")} vseti.app</span>'
-        f'<span class="chip chip--on">{icon("ti-rss")} getmatch</span></label>'
+        f'placeholder="@ml_jobs&#10;@product_jobs">{escape(channels)}</textarea></label>'
+        + tg_note
+        + '<div class="field__label">Агрегаторы</div>'
+        f'<label class="chip-toggle"><input type="checkbox" name="use_aggregators"{agg}>'
+        f'<span class="{chip_cls}">{icon("ti-rss")} vseti.app</span>'
+        f'<span class="{chip_cls}">{icon("ti-rss")} getmatch</span></label>'
         "</section>"
     )
 
@@ -184,50 +220,86 @@ def _engine_pointer() -> str:
     )
 
 
-def _output_card() -> str:
+def _output_card(
+    *, out_table: bool = True, out_bot: bool = True, threshold: int = 70,
+    enable_contacts: bool = False, has_bot_token: bool = False,
+) -> str:
+    tbl = " checked" if out_table else ""
+    bot = " checked" if out_bot else ""
+    contacts = " checked" if enable_contacts else ""
+    token_note = ' <span class="hint-set">задан ✓</span>' if has_bot_token else ""
     return (
         '<section class="card">'
         f'<div class="card__title">{icon("ti-arrow-bar-to-down")} Выхлоп</div>'
         '<div class="field__label">Куда выгружать</div>'
-        '<label class="chip-toggle"><input type="checkbox" name="out_table" checked>'
-        f'<span class="chip chip--on">{icon("ti-table")} Таблица .xlsx</span></label>'
-        '<label class="chip-toggle"><input type="checkbox" name="out_bot" checked>'
-        f'<span class="chip chip--on">{icon("ti-brand-telegram")} Telegram-бот</span></label>'
-        '<label class="field"><span class="field__label">Telegram bot token (секрет)</span>'
+        f'<label class="chip-toggle"><input type="checkbox" name="out_table"{tbl}>'
+        f'<span class="chip {"chip--on" if out_table else ""}">'
+        f'{icon("ti-table")} Таблица .xlsx</span></label>'
+        f'<label class="chip-toggle"><input type="checkbox" name="out_bot"{bot}>'
+        f'<span class="chip {"chip--on" if out_bot else ""}">'
+        f'{icon("ti-brand-telegram")} Telegram-бот</span></label>'
+        '<label class="field"><span class="field__label">Telegram bot token (секрет)'
+        f"{token_note}</span>"
         '<input class="input" name="bot_token" type="password" placeholder="от @BotFather">'
         "</label>"
         '<label class="field"><span class="field__label">Сопроводительное — порог '
-        '<output id="threshold-val">70%</output></span>'
+        f'<output id="threshold-val">{threshold}%</output></span>'
         '<input type="range" class="slider" name="cover_threshold" min="0" max="100" '
-        'value="70" oninput="document.getElementById(&#39;threshold-val&#39;).value='
+        f'value="{threshold}" oninput="document.getElementById(&#39;threshold-val&#39;).value='
         "this.value+&#39;%&#39;\"></label>"
-        '<label class="chip-toggle"><input type="checkbox" name="enable_contacts">'
+        f'<label class="chip-toggle"><input type="checkbox" name="enable_contacts"{contacts}>'
         '<span class="chip">Контакт-ассист (черновик, без отправки)</span></label>'
         "</section>"
     )
 
 
-def _footer() -> str:
+def _footer(backfill_days: int = 14) -> str:
     return (
         '<div class="form-footer">'
+        '<label class="field" style="max-width:160px"><span class="field__label">'
+        'Глубина backfill (дней)</span>'
+        f'<input class="input" type="number" name="backfill_days" min="1" max="90" '
+        f'value="{backfill_days}"></label>'
+        '<div style="display:flex;gap:8px;align-items:flex-end">'
         '<button type="submit" name="action" value="save" class="btn">Сохранить</button>'
         '<button type="submit" name="action" value="backfill" class="btn btn--accent">'
-        f'{icon("ti-player-play")} Запустить backfill</button>'
+        f'{icon("ti-player-play")} Запустить backfill</button></div>'
         "</div>"
     )
 
 
-def render_settings() -> str:
-    """Экран 1 «Настройка» целиком (форма POST → /save)."""
+def render_settings(cfg: dict | None = None) -> str:
+    """Экран 1 «Настройка» целиком (форма POST → /save), с подстановкой
+    сохранённых значений из текущего `config.json` (cfg)."""
+    cfg = cfg or {}
+    tracks = cfg.get("tracks") or []
+    search_map_path = (cfg.get("search_map") or {}).get("path", "")
+    public_channels = "\n".join(
+        c.get("handle", "")
+        for c in (cfg.get("tg_channels") or [])
+        if not c.get("private")
+    )
+    private_count = sum(
+        1 for c in (cfg.get("tg_channels") or []) if c.get("private")
+    )
+    mode = cfg.get("output_mode", "both")
     return (
         _header()
         + _warning()
         + '<form method="post" action="/save">'
-        + _profile_card()
-        + _sources_card()
+        + _profile_card(tracks, search_map_path)
+        + _sources_card(
+            public_channels, cfg.get("use_aggregators", True), private_count
+        )
         + _engine_pointer()
-        + _output_card()
-        + _footer()
+        + _output_card(
+            out_table=mode in ("table", "both"),
+            out_bot=mode in ("bot", "both"),
+            threshold=int(cfg.get("cover_letter_threshold", 70)),
+            enable_contacts=bool(cfg.get("enable_contacts")),
+            has_bot_token=bool(cfg.get("bot_token")),
+        )
+        + _footer(int(cfg.get("backfill_days", 14)))
         + "</form>"
     )
 
@@ -394,7 +466,7 @@ def _engine_header() -> str:
 
 
 def render_telegram(*, has_api_id: str = "", has_api_hash: bool = False,
-                    has_session: bool = False) -> str:
+                    has_session: bool = False, saved: list[str] | None = None) -> str:
     """Экран «Telegram»: логин по телефону (api_id/api_hash → код → 2FA) +
     выгрузка каналов с авто-подбором «про вакансии». Поток ведёт telegram.js."""
     hash_note = ' <span class="hint-set">задан ✓</span>' if has_api_hash else ""
@@ -420,11 +492,22 @@ def render_telegram(*, has_api_id: str = "", has_api_hash: bool = False,
         '<div class="login-flow__out" data-tg-login></div>'
         "</section>"
     )
+    saved = saved or []
+    saved_block = (
+        '<div class="card__meta">Сейчас в поиске (<b>'
+        + str(len(saved))
+        + "</b>): "
+        + escape(", ".join("@" + h for h in saved))
+        + "</div>"
+        if saved
+        else '<div class="card__meta">Пока не выбрано ни одного канала.</div>'
+    )
     channels = (
         '<section class="card"><div class="card__title">'
         f'{icon("ti-list-check")} Каналы</div>'
-        '<div class="card__meta">После входа: выгрузим твои каналы и AI отметит '
-        "те, что про вакансии. Сними/поставь галочки и сохрани.</div>"
+        + saved_block
+        + '<div class="card__meta">«Выгрузить каналы»: подтянем твои каналы и AI '
+        "отметит те, что про вакансии. Сними/поставь галочки и сохрани.</div>"
         '<button type="button" class="btn tg-channels">'
         f'{icon("ti-refresh")} Выгрузить каналы</button>'
         '<span class="path-input__status" data-tg-channels-status></span>'
