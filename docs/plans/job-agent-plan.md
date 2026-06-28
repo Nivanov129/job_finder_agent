@@ -108,9 +108,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 0.2: Загрузчик конфига
-- [ ] `config.py`: читает JSON, валидирует против `config.schema.json` (jsonschema), возвращает типизированный `Config` (pydantic), хелпер `Config.is_single_track`. Ошибки валидации — внятные.
-- [ ] Тесты: `config.example.json` грузится; битый конфиг даёт понятную ошибку; одно-трековый конфиг → `is_single_track==True`.
-- [ ] Mark completed
+- [x] `config.py`: читает JSON, валидирует против `config.schema.json` (jsonschema), возвращает типизированный `Config` (pydantic), хелпер `Config.is_single_track`. Ошибки валидации — внятные.
+- [x] Тесты: `config.example.json` грузится; битый конфиг даёт понятную ошибку; одно-трековый конфиг → `is_single_track==True`.
+- [x] Mark completed
 
 ### Task 0.3: Модели данных
 - [ ] `models.py`: `RawPost`, `Vacancy`, `Track`, `RoutedVacancy`, `ScoreResult` (точно по схеме вывода `prompts/scoring.md`), `EnrichedResult`. Pydantic-валидация процентов 0–100.
