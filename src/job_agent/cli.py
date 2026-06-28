@@ -1,0 +1,84 @@
+"""CLI агента подбора вакансий.
+
+Команда `backfill` прогоняет исторический проход (стадии 1–5 + xlsx) за N дней
+и пишет `.xlsx`. Логи стадий идут через `logging` в stdout: «собрано N · после
+фильтра M · топ-K». Боевые внешние границы строятся по конфигу внутри пайплайна.
+"""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import sys
+from collections.abc import Sequence
+from pathlib import Path
+
+from .config import load_config
+from .pipeline import run_backfill
+from .prefilter import DEFAULT_LIMIT, DEFAULT_MIN_SIM
+
+__all__ = ["main", "build_parser"]
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="job-agent", description="Локальный агент подбора вакансий"
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    backfill = sub.add_parser(
+        "backfill", help="Исторический прогон за N дней → .xlsx"
+    )
+    backfill.add_argument("--config", required=True, help="Путь к config.json")
+    backfill.add_argument(
+        "--days",
+        type=int,
+        default=None,
+        help="Глубина в днях (дефолт — backfill_days из конфига)",
+    )
+    backfill.add_argument(
+        "--out",
+        default="job-agent-result.xlsx",
+        help="Путь к выходному .xlsx",
+    )
+    backfill.add_argument(
+        "--min-sim",
+        type=float,
+        default=DEFAULT_MIN_SIM,
+        help=f"Порог близости пре-фильтра (дефолт {DEFAULT_MIN_SIM}, калибруется)",
+    )
+    backfill.add_argument(
+        "--limit",
+        type=int,
+        default=DEFAULT_LIMIT,
+        help=f"Сколько финалистов скорить (дефолт {DEFAULT_LIMIT})",
+    )
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
+
+    if args.command == "backfill":
+        config = load_config(args.config)
+        base_dir = Path(args.config).resolve().parent
+        result = run_backfill(
+            config,
+            days=args.days,
+            output_path=args.out,
+            base_dir=base_dir,
+            min_sim=args.min_sim,
+            limit=args.limit,
+        )
+        logging.getLogger("job_agent.cli").info("Готово: %s", result.output_path)
+        return 0
+
+    parser.error(f"неизвестная команда: {args.command}")  # pragma: no cover
+    return 2
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

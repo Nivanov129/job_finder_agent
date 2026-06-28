@@ -185,9 +185,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 1.13: Сборка пайплайна + backfill CLI
-- [ ] `pipeline.py` (сшивает стадии 1–5 + xlsx, дефолтный порог `best_sim` конфигурируем), `cli.py` команда `backfill --days N --config path`, логи: собрано N · после фильтра M · топ-K.
-- [ ] End-to-end тест на фейк-движке и фикстурах коллекторов → валидный `.xlsx` без сети.
-- [ ] Mark completed
+- [x] `pipeline.py` (сшивает стадии 1–5 + xlsx, дефолтный порог `best_sim` конфигурируем), `cli.py` команда `backfill --days N --config path`, логи: собрано N · после фильтра M · топ-K.
+- [x] End-to-end тест на фейк-движке и фикстурах коллекторов → валидный `.xlsx` без сети.
+- [x] Mark completed
 
 ## Фаза 2 — Nightly + бот (милстоун 2)
 
