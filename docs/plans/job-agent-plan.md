@@ -113,9 +113,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 0.3: Модели данных
-- [ ] `models.py`: `RawPost`, `Vacancy`, `Track`, `RoutedVacancy`, `ScoreResult` (точно по схеме вывода `prompts/scoring.md`), `EnrichedResult`. Pydantic-валидация процентов 0–100.
-- [ ] Тесты на валидацию диапазонов и обязательные поля.
-- [ ] Mark completed
+- [x] `models.py`: `RawPost`, `Vacancy`, `Track`, `RoutedVacancy`, `ScoreResult` (точно по схеме вывода `prompts/scoring.md`), `EnrichedResult`. Pydantic-валидация процентов 0–100.
+- [x] Тесты на валидацию диапазонов и обязательные поля.
+- [x] Mark completed
 
 ### Task 0.4: Общие константы представления
 - [ ] `presentation.py` по `design/design-tokens.md`: `badge_band(overall)->'green'|'amber'|'grey'` (дефолт ≥80 / 70–79 / <70, конфигурируемо), hex-цвета бейджей (для xlsx-заливки и web/бота), маппинг `verdict.type → (иконка, тон)`. Единственный источник для xlsx (Task 1.12), бота (Task 2.3), web-UI (Фаза 5).
