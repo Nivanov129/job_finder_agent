@@ -28,10 +28,18 @@ __all__ = [
     "build_classify_prompt",
     "parse_channel_ids",
     "TELEGRAM_ENV_KEYS",
+    "DEFAULT_API_ID",
+    "DEFAULT_API_HASH",
 ]
 
 # Ключи авторизации Telegram в `.env` (секреты, не в config.json).
 TELEGRAM_ENV_KEYS = ("TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_SESSION")
+
+# api_id/api_hash приложения Telegram — постоянны (идентифицируют приложение, не
+# аккаунт; секрет — это сессия). Зашиты, чтобы не вводить их каждый раз; .env
+# переопределяет при необходимости.
+DEFAULT_API_ID = "REDACTED_API_ID"
+DEFAULT_API_HASH = "REDACTED_API_HASH"
 
 
 # ── AI-классификация каналов (чистая логика, тестируется на фейк-движке) ──────

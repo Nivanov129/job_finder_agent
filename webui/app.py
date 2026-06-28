@@ -39,7 +39,11 @@ from webui.render import (
     save_result_page,
 )
 from webui.runner import BackfillRunner
-from webui.telegram_login import classify_channels
+from webui.telegram_login import (
+    DEFAULT_API_HASH,
+    DEFAULT_API_ID,
+    classify_channels,
+)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -307,8 +311,6 @@ def create_app(
         ]
         return page(
             render_telegram(
-                has_api_id=env.get("TELEGRAM_API_ID", ""),
-                has_api_hash=bool(env.get("TELEGRAM_API_HASH")),
                 has_session=bool(env.get("TELEGRAM_SESSION")),
                 saved=saved,
             ),
@@ -319,13 +321,21 @@ def create_app(
     @app.post("/telegram/login/start")
     async def telegram_start(request: Request) -> JSONResponse:
         form = await request.form()
+        env = {**os.environ, **parse_env(envfile)}
+        # api_id/api_hash зашиты (постоянны), .env переопределяет; форма — только телефон.
         res = await run_in_threadpool(
             _tg_login().start,
-            str(form.get("api_id", "")),
-            str(form.get("api_hash", "")),
+            env.get("TELEGRAM_API_ID") or DEFAULT_API_ID,
+            env.get("TELEGRAM_API_HASH") or DEFAULT_API_HASH,
             str(form.get("phone", "")),
         )
         return JSONResponse(res, status_code=200 if res.get("ok") else 400)
+
+    @app.post("/telegram/logout")
+    async def telegram_logout() -> JSONResponse:
+        # Выход: убрать сессию из .env (api_id/api_hash оставляем — они постоянны).
+        merge_env(envfile, {"TELEGRAM_SESSION": None})
+        return JSONResponse({"ok": True})
 
     @app.post("/telegram/login/code")
     async def telegram_code(request: Request) -> JSONResponse:
@@ -360,7 +370,9 @@ def create_app(
         except Exception:
             job_ids = set()
         out = [{**c, "job": str(c["id"]) in job_ids} for c in channels]
-        return JSONResponse({"channels": out})
+        # Сначала каналы с вакансиями (галочка), потом остальные.
+        out.sort(key=lambda c: (not c["job"], str(c.get("title", "")).lower()))
+        return JSONResponse({"channels": out, "job_count": len(job_ids)})
 
     @app.post("/telegram/save", response_class=HTMLResponse)
     async def telegram_save(request: Request) -> HTMLResponse:

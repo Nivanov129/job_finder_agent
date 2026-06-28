@@ -58,12 +58,14 @@
     }
     if (ev.target.closest(".tg-start")) {
       loginMsg("Отправляю код…");
-      post("/telegram/login/start", {
-        api_id: field("tg_api_id"), api_hash: field("tg_api_hash"), phone: field("tg_phone"),
-      }).then(function (r) {
+      post("/telegram/login/start", { phone: field("tg_phone") }).then(function (r) {
         if (!r.ok) return loginMsg("✗ " + (r.body.message || "ошибка"), "is-error");
         codeForm();
       }).catch(function () { loginMsg("✗ сеть", "is-error"); });
+      return;
+    }
+    if (ev.target.closest(".tg-logout")) {
+      post("/telegram/logout", {}).then(function () { location.reload(); });
       return;
     }
     if (ev.target.closest("[data-tg-code-btn]")) {
@@ -96,7 +98,8 @@
           return;
         }
         renderChannels(chs);
-        if (st) st.textContent = "✓ каналов: " + chs.length, (st.className = "path-input__status is-ok");
+        var jobN = (r.body.job_count != null) ? r.body.job_count : chs.filter(function (c) { return c.job; }).length;
+        if (st) st.textContent = "✓ всего " + chs.length + " · с вакансиями: " + jobN, (st.className = "path-input__status is-ok");
       }).catch(function () { if (st) st.textContent = "✗ сеть", (st.className = "path-input__status is-error"); });
       return;
     }

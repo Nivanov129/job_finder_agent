@@ -518,7 +518,9 @@ class _FakeTg:
 def test_telegram_page_renders(tmp_path: Path) -> None:
     client = TestClient(create_app(config_path=tmp_path / "config.json"))
     body = client.get("/telegram").text
-    assert "Вход в Telegram" in body and 'name="tg_api_id"' in body
+    # без сессии — форма телефона; api_id/api_hash зашиты, полей нет
+    assert "Вход в Telegram" in body and 'name="tg_phone"' in body
+    assert 'name="tg_api_id"' not in body and 'name="tg_api_hash"' not in body
     assert "/static/js/telegram.js" in body
 
 
@@ -542,6 +544,16 @@ def test_telegram_channels_lists(tmp_path: Path) -> None:
     data = client.post("/telegram/channels").json()
     assert data["channels"][0]["id"] == "jobs"
     assert "job" in data["channels"][0]  # помечен (классификация опциональна)
+    assert "job_count" in data  # число каналов с вакансиями
+
+
+def test_telegram_logout_clears_session(tmp_path: Path) -> None:
+    env = tmp_path / ".env"
+    env.write_text("TELEGRAM_SESSION=abc\nTELEGRAM_API_ID=1\n", encoding="utf-8")
+    client = TestClient(create_app(config_path=tmp_path / "config.json"))
+    assert client.post("/telegram/logout").json()["ok"] is True
+    text = env.read_text(encoding="utf-8")
+    assert "TELEGRAM_SESSION" not in text and "TELEGRAM_API_ID=1" in text
 
 
 def test_telegram_save_writes_private_channels(tmp_path: Path) -> None:

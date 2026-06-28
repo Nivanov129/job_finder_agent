@@ -465,33 +465,37 @@ def _engine_header() -> str:
     )
 
 
-def render_telegram(*, has_api_id: str = "", has_api_hash: bool = False,
-                    has_session: bool = False, saved: list[str] | None = None) -> str:
-    """Экран «Telegram»: логин по телефону (api_id/api_hash → код → 2FA) +
-    выгрузка каналов с авто-подбором «про вакансии». Поток ведёт telegram.js."""
-    hash_note = ' <span class="hint-set">задан ✓</span>' if has_api_hash else ""
-    session_badge = (
-        '<span class="hint-set">вход выполнен ✓</span>' if has_session else ""
-    )
-    login = (
-        '<section class="card"><div class="card__title">'
-        f'{icon("ti-brand-telegram")} Вход в Telegram {session_badge}</div>'
-        '<div class="card__meta">Нужны api_id/api_hash с '
-        + _copy_cmd("my.telegram.org/apps")
-        + " — это безопасно (только чтение твоих каналов).</div>"
-        '<label class="field"><span class="field__label">api_id</span>'
-        f'<input class="input" name="tg_api_id" value="{escape(has_api_id)}" '
-        'placeholder="12345678"></label>'
-        f'<label class="field"><span class="field__label">api_hash{hash_note}</span>'
-        '<input class="input" type="password" name="tg_api_hash" '
-        'placeholder="вставьте api_hash"></label>'
-        '<label class="field"><span class="field__label">Телефон</span>'
-        '<input class="input" name="tg_phone" placeholder="+79991234567"></label>'
-        '<button type="button" class="btn btn--accent tg-start">'
-        f'{icon("ti-send")} Получить код</button>'
-        '<div class="login-flow__out" data-tg-login></div>'
-        "</section>"
-    )
+def render_telegram(*, has_session: bool = False, saved: list[str] | None = None) -> str:
+    """Экран «Telegram»: вход по телефону (api_id/api_hash зашиты) → код → 2FA,
+    затем выгрузка каналов с авто-подбором «про вакансии». Поток ведёт telegram.js.
+
+    При активной сессии показываем «вход выполнен» + «Выйти», без формы телефона.
+    """
+    if has_session:
+        login = (
+            '<section class="card"><div class="card__title">'
+            f'{icon("ti-brand-telegram")} Telegram '
+            '<span class="hint-set">вход выполнен ✓</span></div>'
+            '<div class="card__meta">Аккаунт подключён — можно выгружать каналы '
+            "ниже.</div>"
+            '<button type="button" class="btn tg-logout">'
+            f'{icon("ti-logout")} Выйти</button>'
+            '<div class="login-flow__out" data-tg-login></div>'
+            "</section>"
+        )
+    else:
+        login = (
+            '<section class="card"><div class="card__title">'
+            f'{icon("ti-brand-telegram")} Вход в Telegram</div>'
+            '<div class="card__meta">Только чтение твоих каналов. Введи номер — '
+            "придёт код в Telegram.</div>"
+            '<label class="field"><span class="field__label">Телефон</span>'
+            '<input class="input" name="tg_phone" placeholder="+79991234567"></label>'
+            '<button type="button" class="btn btn--accent tg-start">'
+            f'{icon("ti-send")} Получить код</button>'
+            '<div class="login-flow__out" data-tg-login></div>'
+            "</section>"
+        )
     saved = saved or []
     saved_block = (
         '<div class="card__meta">Сейчас в поиске (<b>'
