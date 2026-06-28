@@ -583,22 +583,38 @@ def render_results(
     return header + f'<div class="results-list">{cards}</div>'
 
 
-def save_result_page(*, ok: bool, action: str = "save", path: str = "", message: str = "") -> str:
-    """Страница-подтверждение после сабмита формы."""
+def save_result_page(
+    *,
+    ok: bool,
+    action: str = "save",
+    path: str = "",
+    message: str = "",
+    note_html: str = "",
+    back_href: str = "/",
+    back_label: str = "вернуться к настройке",
+) -> str:
+    """Страница-подтверждение после сабмита формы.
+
+    `note_html` — доверенная HTML-подсказка (строится маршрутом, напр. про
+    перезапуск стека после смены ключа). `back_href`/`back_label` — ссылка назад.
+    """
+    back = f'<p><a href="{escape(back_href)}">← {escape(back_label)}</a></p>'
     if not ok:
         return (
             '<div class="notice-warning">'
-            f"{icon('ti-alert-triangle')} Конфиг не сохранён: {message}"
-            '</div><p><a href="/">← вернуться к настройке</a></p>'
+            f"{icon('ti-alert-triangle')} Конфиг не сохранён: {escape(message)}"
+            f"</div>{back}"
         )
     started = (
         " Backfill запускается — следите за логами."
         if action == "backfill"
         else ""
     )
+    note = f'<div class="card__meta">{note_html}</div>' if note_html else ""
     return (
         '<div class="card">'
         f'<div class="card__title">{icon("ti-circle-check")} Конфиг сохранён</div>'
-        f'<div class="card__meta">{path}.{started}</div>'
-        '</div><p><a href="/">← вернуться к настройке</a></p>'
+        f'<div class="card__meta">{escape(path)}.{started}</div>'
+        f"{note}"
+        f"</div>{back}"
     )

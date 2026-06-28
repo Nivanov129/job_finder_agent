@@ -167,10 +167,28 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
                 page(save_result_page(ok=False, message=str(exc)), active="/engine"),
                 status_code=400,
             )
+        note_html = ""
         if secrets:  # токены/ключи — в .env, не в config.json
             merge_env(envfile, secrets)
+            # Web-UI перечитывает .env на каждый запрос (кнопка «Проверить» уже
+            # с новым ключом), но пайплайн-контейнер берёт env при старте — для
+            # ночного прогона нужен перезапуск стека.
+            note_html = (
+                "Кнопка «Проверить» уже использует новый ключ. Ночной прогон "
+                "подхватит его после перезапуска стека: "
+                "<code>docker compose up -d</code>."
+            )
         return HTMLResponse(
-            page(save_result_page(ok=True, path=str(target)), active="/engine")
+            page(
+                save_result_page(
+                    ok=True,
+                    path=str(target),
+                    note_html=note_html,
+                    back_href="/engine",
+                    back_label="вернуться к движку",
+                ),
+                active="/engine",
+            )
         )
 
     @app.post("/upload")

@@ -404,6 +404,30 @@ def test_engine_save_ollama_cloud_key_to_env_not_config(tmp_path: Path) -> None:
     assert "sk-cloud" not in cfg_path.read_text(encoding="utf-8")
 
 
+def test_engine_save_secret_shows_restart_hint(tmp_path: Path) -> None:
+    client = TestClient(create_app(config_path=tmp_path / "config.json"))
+    _seed_config(client)
+    r = client.post(
+        "/engine/save",
+        data={"engine": "ollama", "ollama_model": "gpt-oss:120b", "ollama_key": "sk"},
+    )
+    assert r.status_code == 200
+    assert "docker compose up -d" in r.text  # подсказка про перезапуск стека
+    assert "вернуться к движку" in r.text
+
+
+def test_engine_save_without_secret_no_restart_hint(tmp_path: Path) -> None:
+    client = TestClient(create_app(config_path=tmp_path / "config.json"))
+    _seed_config(client)
+    # меняем только модель/URL (config.json) — рестарт стека не нужен
+    r = client.post(
+        "/engine/save",
+        data={"engine": "ollama", "ollama_model": "qwen2", "ollama_url": "http://x:11434"},
+    )
+    assert r.status_code == 200
+    assert "docker compose up -d" not in r.text
+
+
 def test_engine_ollama_models_route(tmp_path: Path, monkeypatch) -> None:
     import webui.engine_status as es
 
