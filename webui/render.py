@@ -179,18 +179,28 @@ def _profile_card(tracks: list[dict] | None = None, search_map_path: str = "") -
 
 
 def _sources_card(
-    channels: str = "", use_aggregators: bool = True, private_count: int = 0
+    channels: str = "", use_aggregators: bool = True,
+    private_handles: list[str] | None = None,
 ) -> str:
     agg = " checked" if use_aggregators else ""
     chip_cls = "chip chip--on" if use_aggregators else "chip"
-    tg_note = (
-        f'<div class="card__meta">Приватные каналы из твоего Telegram: '
-        f"<b>{private_count}</b> — управляются на странице "
-        f'<a href="/telegram">Telegram</a>.</div>'
-        if private_count
-        else '<div class="card__meta">Приватные каналы — на странице '
-        '<a href="/telegram">Telegram</a> (вход в аккаунт + авто-подбор).</div>'
-    )
+    private_handles = private_handles or []
+    if private_handles:
+        chips = "".join(
+            f'<span class="chip">{icon("ti-brand-telegram")} @{escape(h)}</span>'
+            for h in private_handles
+        )
+        tg_block = (
+            '<div class="field__label">Приватные каналы из твоего Telegram '
+            f"(<b>{len(private_handles)}</b>) · меняются на странице "
+            '<a href="/telegram">Telegram</a></div>'
+            f'<div class="chip-list">{chips}</div>'
+        )
+    else:
+        tg_block = (
+            '<div class="card__meta">Приватные каналы — на странице '
+            '<a href="/telegram">Telegram</a> (вход в аккаунт + авто-подбор).</div>'
+        )
     return (
         '<section class="card">'
         f'<div class="card__title">{icon("ti-rss")} Источники</div>'
@@ -198,7 +208,7 @@ def _sources_card(
         "(по одному в строке)</span>"
         '<textarea class="input" name="channels" rows="3" '
         f'placeholder="@ml_jobs&#10;@product_jobs">{escape(channels)}</textarea></label>'
-        + tg_note
+        + tg_block
         + '<div class="field__label">Агрегаторы</div>'
         f'<label class="chip-toggle"><input type="checkbox" name="use_aggregators"{agg}>'
         f'<span class="{chip_cls}">{icon("ti-rss")} vseti.app</span>'
@@ -279,9 +289,11 @@ def render_settings(cfg: dict | None = None) -> str:
         for c in (cfg.get("tg_channels") or [])
         if not c.get("private")
     )
-    private_count = sum(
-        1 for c in (cfg.get("tg_channels") or []) if c.get("private")
-    )
+    private_handles = [
+        c.get("handle", "")
+        for c in (cfg.get("tg_channels") or [])
+        if c.get("private")
+    ]
     mode = cfg.get("output_mode", "both")
     return (
         _header()
@@ -289,7 +301,7 @@ def render_settings(cfg: dict | None = None) -> str:
         + '<form method="post" action="/save">'
         + _profile_card(tracks, search_map_path)
         + _sources_card(
-            public_channels, cfg.get("use_aggregators", True), private_count
+            public_channels, cfg.get("use_aggregators", True), private_handles
         )
         + _engine_pointer()
         + _output_card(
