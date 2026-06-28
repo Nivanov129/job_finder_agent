@@ -22,7 +22,7 @@
 - **Без hh.ru и LinkedIn.** hh мониторите сами; LinkedIn враждебен к автоматизации.
 
 Архитектура, инварианты и порядок задач — в
-[`docs/plans/job-agent-plan.md`](docs/plans/job-agent-plan.md); конвенции проекта —
+[`docs/plans/completed/job-agent-plan.md`](docs/plans/completed/job-agent-plan.md); конвенции проекта —
 в [`CLAUDE.md`](CLAUDE.md).
 
 ## Онбординг (по шагам)
@@ -50,8 +50,8 @@ Docker, создаёт каталог данных (`./data` по умолчан
 [`Dockerfile`](Dockerfile), поднимает стек из [`compose.yml`](compose.yml) и
 открывает конфиг в редакторе.
 
-Стек: пайплайн + self-host SearXNG (web-поиск) + одноразовый прогрев модели
-эмбеддингов `bge-m3` в общий том.
+Стек: пайплайн + self-host SearXNG (web-поиск) + одноразовый прогрев
+мультиязычной модели эмбеддингов `multilingual-e5-large` в общий том.
 
 ### 2. Конфиг
 

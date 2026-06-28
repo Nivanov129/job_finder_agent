@@ -12,8 +12,10 @@
 name: job-agent
 
 services:
-  # Прогрев модели эмбеддингов: один раз скачивает bge-m3 в общий том models,
-  # дальше пайплайн берёт её из кэша без сети. Сервис завершается успехом.
+  # Прогрев модели эмбеддингов: один раз скачивает фиксированную мультиязычную
+  # модель в общий том models, дальше пайплайн берёт её из кэша без сети. Имя
+  # модели берётся из кода (`embeddings.MODEL_NAME`), чтобы не дублировать и не
+  # рассинхронизироваться. Сервис завершается успехом.
   model-init:
     build:
       context: .
@@ -23,7 +25,7 @@ services:
       FASTEMBED_CACHE_PATH: /models
     entrypoint: ["python", "-c"]
     command:
-      - "from fastembed import TextEmbedding; TextEmbedding(model_name='BAAI/bge-m3'); print('embedding model ready')"
+      - "from fastembed import TextEmbedding; from job_agent.embeddings import MODEL_NAME; TextEmbedding(model_name=MODEL_NAME); print('embedding model ready:', MODEL_NAME)"
     volumes:
       - model_cache:/models
     restart: "no"

@@ -84,5 +84,5 @@ def test_similarity_uses_cache():
 
 
 def test_fixed_model_name():
-    assert MODEL_NAME == "BAAI/bge-m3"
+    assert MODEL_NAME == "intfloat/multilingual-e5-large"
     assert Embedder().model_name == MODEL_NAME
