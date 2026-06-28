@@ -172,10 +172,13 @@ def engine_config_from_form(
         config["scoring_engine"] = "ollama"
         model = _clean(form.get("ollama_model", ""))
         url = _clean(form.get("ollama_url", ""))
+        key = _clean(form.get("ollama_key", ""))
         if model:
             config["ollama_model"] = model
-        if url:
+        if url:  # пусто → облако (https://ollama.com) по умолчанию
             config["api_base_url"] = url
+        if key:  # ключ Ollama Cloud — секрет, в .env, не в config.json
+            secrets["OLLAMA_API_KEY"] = key
     elif engine == "api_key":
         config["scoring_engine"] = "api_key"
         base = _clean(form.get("api_base_url", ""))

@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 
 from job_agent.config import ConfigError, load_config
 from webui.components import chip, icon, nav
-from webui.engine_status import engine_statuses
+from webui.engine_status import engine_statuses, ollama_models
 from webui.env_store import merge_env, parse_env
 from webui.forms import config_from_form, engine_config_from_form
 from webui.render import render_engine, render_results, render_settings, save_result_page
@@ -123,11 +123,22 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
                     env.get("CLAUDE_CODE_OAUTH_TOKEN") or env.get("ANTHROPIC_API_KEY")
                 ),
                 has_codex_key=bool(env.get("OPENAI_API_KEY")),
+                has_ollama_key=bool(env.get("OLLAMA_API_KEY")),
                 has_api_key=bool(cfg.get("api_key")),
             ),
             scripts='<script src="/static/js/engine.js"></script>',
             active="/engine",
         )
+
+    @app.get("/engine/ollama/models")
+    def engine_ollama_models(url: str = "") -> JSONResponse:
+        # Список моделей для выпадающего списка: облако (ключ из .env) или свой
+        # сервер по `url`. Недоступность → пустой список (JS оставит свободный ввод).
+        env = {**os.environ, **parse_env(envfile)}
+        cfg = _load_raw(target)
+        saved = cfg.get("api_base_url", "") if cfg.get("scoring_engine") == "ollama" else ""
+        models = ollama_models(url or saved, api_key=env.get("OLLAMA_API_KEY"))
+        return JSONResponse({"models": models})
 
     @app.get("/engine/status")
     def engine_status() -> JSONResponse:
@@ -263,8 +274,11 @@ def _probe_engine(engine_key: str, cfg: dict, envfile: Path) -> tuple[bool, str]
         elif engine_key == "ollama":
             from job_agent.engines.ollama import OllamaEngine
 
+            env = {**os.environ, **parse_env(envfile)}
             out = OllamaEngine(
-                cfg.get("ollama_model") or "", base_url=cfg.get("api_base_url")
+                cfg.get("ollama_model") or "",
+                base_url=cfg.get("api_base_url"),
+                api_key=env.get("OLLAMA_API_KEY"),  # свежий ключ из .env сразу
             ).complete(prompt)
         elif engine_key == "api_key":
             from job_agent.engines.api_key import ApiKeyEngine

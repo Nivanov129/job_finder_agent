@@ -59,7 +59,7 @@ services:
       JOB_AGENT_SEEN_DB: /var/lib/job-agent/job_agent_seen.db
     env_file:
       # Секреты и токены авторизации AI-движков (CLAUDE_CODE_OAUTH_TOKEN,
-      # OPENAI_API_KEY, ANTHROPIC_API_KEY, Telethon, токен бота) — только через
+      # OPENAI_API_KEY, ANTHROPIC_API_KEY, OLLAMA_API_KEY, Telethon, токен бота) — только через
       # .env в каталоге данных, его пишет страница web-UI «AI · авторизация».
       - path: ./data/.env
         required: false

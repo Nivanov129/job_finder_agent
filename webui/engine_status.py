@@ -15,16 +15,27 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-__all__ = ["EngineStatus", "engine_statuses", "claude_status", "codex_status", "ollama_status"]
+__all__ = [
+    "EngineStatus",
+    "engine_statuses",
+    "claude_status",
+    "codex_status",
+    "ollama_status",
+    "ollama_models",
+    "CLOUD_BASE_URL",
+]
 
 # Внешние границы (в тестах подменяются фейками).
 WhichFn = Callable[[str], str | None]
 RunFn = Callable[[list[str]], str]  # argv -> stdout (для --version)
-HttpGetFn = Callable[[str], dict[str, Any]]  # url -> json (Ollama /api/tags)
+# (url, headers) -> json (Ollama /api/tags; headers несут Bearer для облака).
+HttpGetFn = Callable[[str, Mapping[str, str]], dict[str, Any]]
 
 # Куда CLI-агенты кладут авторизацию (внутри контейнера; см. mounts в compose).
 CLAUDE_CREDS = Path("/root/.claude/.credentials.json")
 CODEX_AUTH = Path("/root/.codex/auth.json")
+# Облачный хост Ollama Cloud — дефолт, если адрес своего сервера не задан.
+CLOUD_BASE_URL = "https://ollama.com"
 
 
 @dataclass
@@ -79,18 +90,47 @@ def codex_status(
     return EngineStatus("codex", "Codex", "subscription", installed, authorized, detail)
 
 
-def ollama_status(url: str, *, http_get: HttpGetFn) -> EngineStatus:
-    reachable = False
-    detail = "укажите URL сервера Ollama"
-    if url:
-        try:
-            data = http_get(f"{url.rstrip('/')}/api/tags")
-            models = [m.get("name", "") for m in (data.get("models") or [])]
-            reachable = True
-            detail = ("модели: " + ", ".join(filter(None, models))) if models else "сервер доступен"
-        except Exception:
-            detail = f"сервер недоступен: {url}"
-    return EngineStatus("ollama", "Ollama", "free", None, reachable, detail)
+def _ollama_headers(api_key: str | None) -> dict[str, str]:
+    return {"authorization": f"Bearer {api_key}"} if api_key else {}
+
+
+def ollama_models(
+    url: str = "", *, api_key: str | None = None, http_get: HttpGetFn | None = None
+) -> list[str]:
+    """Список доступных моделей Ollama (облако или свой сервер) через `/api/tags`.
+
+    Облако (`ollama.com`) требует ключ — заголовок `Authorization: Bearer`.
+    Сетевые ошибки наружу не пробрасываются: недоступность → пустой список.
+    """
+    http_get = http_get or _default_http_get
+    base = (url or CLOUD_BASE_URL).rstrip("/")
+    try:
+        data = http_get(f"{base}/api/tags", _ollama_headers(api_key))
+    except Exception:
+        return []
+    return [m.get("name", "") for m in (data.get("models") or []) if m.get("name")]
+
+
+def ollama_status(
+    url: str = "", *, api_key: str | None = None, http_get: HttpGetFn
+) -> EngineStatus:
+    base = (url or CLOUD_BASE_URL).rstrip("/")
+    is_cloud = base == CLOUD_BASE_URL or bool(api_key)
+    label = "Ollama Cloud" if is_cloud else "Ollama"
+    # Облаку нужен ключ — без него и не пытаемся ходить в сеть.
+    if is_cloud and not api_key:
+        return EngineStatus(
+            "ollama", label, "free", None, False,
+            "нужен ключ OLLAMA_API_KEY (ollama.com/settings/keys)",
+        )
+    try:
+        data = http_get(f"{base}/api/tags", _ollama_headers(api_key))
+        models = [m.get("name", "") for m in (data.get("models") or [])]
+        detail = ("модели: " + ", ".join(filter(None, models))) if models else "сервер доступен"
+        return EngineStatus("ollama", label, "free", None, True, detail)
+    except Exception:
+        where = "облако ollama.com" if is_cloud else url
+        return EngineStatus("ollama", label, "free", None, False, f"недоступно: {where}")
 
 
 def api_key_status(*, has_key: bool) -> EngineStatus:
@@ -107,13 +147,16 @@ def engine_statuses(
     run: RunFn | None = None,
     http_get: HttpGetFn | None = None,
 ) -> list[EngineStatus]:
-    """Состояния всех движков (порядок = порядок карточек в UI)."""
+    """Состояния всех движков (порядок = порядок карточек в UI).
+
+    Ключ Ollama Cloud берётся из `env['OLLAMA_API_KEY']` — секрет живёт в `.env`.
+    """
     run = run or _default_run
     http_get = http_get or _default_http_get
     return [
         claude_status(which=which, run=run, env=env),
         codex_status(which=which, run=run, env=env),
-        ollama_status(ollama_url, http_get=http_get),
+        ollama_status(ollama_url, api_key=env.get("OLLAMA_API_KEY"), http_get=http_get),
         api_key_status(has_key=has_api_key),
     ]
 
@@ -124,9 +167,11 @@ def _default_run(argv: list[str]) -> str:  # pragma: no cover - реальный
     return subprocess.run(argv, capture_output=True, text=True, timeout=10).stdout
 
 
-def _default_http_get(url: str) -> dict[str, Any]:  # pragma: no cover - реальная сеть
+def _default_http_get(  # pragma: no cover - реальная сеть
+    url: str, headers: Mapping[str, str]
+) -> dict[str, Any]:
     import httpx
 
-    r = httpx.get(url, timeout=3.0)
+    r = httpx.get(url, headers=dict(headers), timeout=5.0)
     r.raise_for_status()
     return r.json()

@@ -272,6 +272,7 @@ def render_engine(
     web_search_url: str = "",
     has_claude_token: bool = False,
     has_codex_key: bool = False,
+    has_ollama_key: bool = False,
     has_api_key: bool = False,
 ) -> str:
     """Экран «AI · авторизация»: выбор движка, статус, авторизация, web-поиск.
@@ -289,7 +290,7 @@ def render_engine(
                        active=active == "claude")
         + _engine_choice("codex", "Codex", "codex exec · CLI", "подписка",
                          active=active == "codex")
-        + _engine_choice("ollama", "Ollama", "локальная модель", "бесплатно",
+        + _engine_choice("ollama", "Ollama Cloud", "облачные модели", "нужен ключ",
                          active=active == "ollama")
         + _engine_choice("api_key", "Свой API-ключ", "Anthropic / OpenAI", "свой ключ",
                          active=active == "api_key")
@@ -321,15 +322,22 @@ def render_engine(
     )
     ollama_panel = _auth_panel(
         "ollama",
-        "Ollama — бесплатно, локально",
-        "Авторизация не нужна — укажите адрес сервера Ollama "
-        "(из контейнера обычно <code>http://host.docker.internal:11434</code>) и модель.",
-        '<label class="field"><span class="field__label">URL сервера</span>'
-        f'<input class="input" name="ollama_url" value="{escape(ollama_url)}" '
-        'placeholder="http://host.docker.internal:11434"></label>'
-        '<label class="field"><span class="field__label">Модель</span>'
+        "Ollama Cloud — облачные модели, нужен ключ",
+        "Большие модели в облаке без локального GPU. Ключ — на "
+        "<code>ollama.com/settings/keys</code>, вставьте ниже (живёт в .env). "
+        "Свой/локальный сервер — укажите его URL, тогда ключ не нужен.",
+        secret_field("ollama_key", "OLLAMA_API_KEY", "вставьте ключ облака",
+                     has=has_ollama_key)
+        + '<label class="field"><span class="field__label">Модель</span>'
         f'<input class="input" name="ollama_model" value="{escape(ollama_model)}" '
-        'placeholder="llama3.1:70b"></label>',
+        'placeholder="gpt-oss:120b" data-ollama-model-input></label>'
+        '<select class="input" data-ollama-model-select hidden '
+        'aria-label="выбрать модель с сервера">'
+        '<option value="">— модели сервера —</option></select>'
+        '<label class="field"><span class="field__label">URL своего сервера (опц.)</span>'
+        f'<input class="input" name="ollama_url" value="{escape(ollama_url)}" '
+        'placeholder="оставьте пустым для облака · http://host.docker.internal:11434">'
+        "</label>",
     )
     apikey_panel = _auth_panel(
         "api_key",

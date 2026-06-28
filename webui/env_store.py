@@ -19,6 +19,7 @@ KNOWN_AUTH_KEYS: tuple[str, ...] = (
     "CLAUDE_CODE_OAUTH_TOKEN",
     "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
+    "OLLAMA_API_KEY",
 )
 
 

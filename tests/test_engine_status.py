@@ -11,6 +11,7 @@ from webui.engine_status import (
     claude_status,
     codex_status,
     engine_statuses,
+    ollama_models,
     ollama_status,
 )
 from webui.env_store import merge_env, parse_env
@@ -58,32 +59,81 @@ def test_codex_authorized_by_env_key(tmp_path: Path) -> None:
     assert st.installed is True and st.authorized is True
 
 
-def test_ollama_reachable_lists_models() -> None:
-    def http_get(url: str) -> dict:
+def test_ollama_local_reachable_lists_models() -> None:
+    def http_get(url: str, headers: dict) -> dict:
         assert url.endswith("/api/tags")
+        assert "authorization" not in headers  # свой сервер — без ключа
         return {"models": [{"name": "llama3.1:70b"}]}
 
     st = ollama_status("http://ollama:11434", http_get=http_get)
     assert st.authorized is True and st.installed is None
     assert "llama3.1:70b" in st.detail
-    assert st.billing == "free"
+    assert st.label == "Ollama"
+
+
+def test_ollama_cloud_needs_key() -> None:
+    called = False
+
+    def http_get(url: str, headers: dict) -> dict:
+        nonlocal called
+        called = True
+        return {"models": []}
+
+    st = ollama_status("", api_key=None, http_get=http_get)  # облако без ключа
+    assert st.authorized is False
+    assert st.label == "Ollama Cloud"
+    assert "OLLAMA_API_KEY" in st.detail
+    assert called is False  # без ключа в сеть не ходим
+
+
+def test_ollama_cloud_authorized_sends_bearer() -> None:
+    def http_get(url: str, headers: dict) -> dict:
+        assert url == "https://ollama.com/api/tags"
+        assert headers["authorization"] == "Bearer sk-cloud"
+        return {"models": [{"name": "gpt-oss:120b"}]}
+
+    st = ollama_status("", api_key="sk-cloud", http_get=http_get)
+    assert st.authorized is True
+    assert "gpt-oss:120b" in st.detail
 
 
 def test_ollama_unreachable() -> None:
-    def http_get(url: str) -> dict:
+    def http_get(url: str, headers: dict) -> dict:
         raise ConnectionError("nope")
 
     st = ollama_status("http://ollama:11434", http_get=http_get)
     assert st.authorized is False
 
 
-def test_engine_statuses_order_and_keys() -> None:
+def test_ollama_models_helper_returns_names() -> None:
+    def http_get(url: str, headers: dict) -> dict:
+        assert headers["authorization"] == "Bearer k"
+        return {"models": [{"name": "a"}, {"name": "b"}, {"other": "x"}]}
+
+    assert ollama_models("", api_key="k", http_get=http_get) == ["a", "b"]
+
+
+def test_ollama_models_helper_swallows_errors() -> None:
+    def http_get(url: str, headers: dict) -> dict:
+        raise ConnectionError("nope")
+
+    assert ollama_models("http://x:11434", http_get=http_get) == []
+
+
+def test_engine_statuses_threads_ollama_key() -> None:
+    seen: dict[str, dict] = {}
+
+    def http_get(url: str, headers: dict) -> dict:
+        seen["headers"] = headers
+        return {"models": []}
+
     states = engine_statuses(
-        env={}, ollama_url="", has_api_key=False,
+        env={"OLLAMA_API_KEY": "sk"}, ollama_url="", has_api_key=False,
         which=_which({"claude", "codex"}), run=_run_ok,
-        http_get=lambda url: {"models": []},
+        http_get=http_get,
     )
     assert [s.key for s in states] == ["claude", "codex", "ollama", "api_key"]
+    assert seen["headers"]["authorization"] == "Bearer sk"
 
 
 def test_parse_and_merge_env(tmp_path: Path) -> None:

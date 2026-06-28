@@ -264,10 +264,10 @@ def test_engine_page_default_is_claude(client: TestClient) -> None:
     # дефолтный движок на странице AI — Claude (checked)
     claude = body.split('value="claude"', 1)[1][:40]
     assert "checked" in claude
-    # четыре движка + пометки биллинга (подписка/бесплатно/свой ключ)
+    # четыре движка + пометки биллинга (подписка/нужен ключ/свой ключ)
     for value in ('value="claude"', 'value="codex"', 'value="ollama"', 'value="api_key"'):
         assert value in body
-    assert "подписка" in body and "бесплатно" in body
+    assert "подписка" in body and "нужен ключ" in body
     # статус подтягивается локальным engine.js, без CDN
     assert "/static/js/engine.js" in body
     assert "cdn.jsdelivr.net" not in body
@@ -381,6 +381,38 @@ def test_engine_save_ollama_uses_url_and_model(tmp_path: Path) -> None:
     assert cfg.scoring_engine == "ollama"
     assert cfg.ollama_model == "llama3.1:70b"
     assert cfg.api_base_url == "http://host.docker.internal:11434"
+
+
+def test_engine_save_ollama_cloud_key_to_env_not_config(tmp_path: Path) -> None:
+    from job_agent.config import load_config
+
+    cfg_path = tmp_path / "config.json"
+    client = TestClient(create_app(config_path=cfg_path))
+    _seed_config(client)
+    r = client.post(
+        "/engine/save",
+        data={"engine": "ollama", "ollama_model": "gpt-oss:120b", "ollama_key": "sk-cloud"},
+    )
+    assert r.status_code == 200
+    cfg = load_config(cfg_path)
+    assert cfg.scoring_engine == "ollama" and cfg.ollama_model == "gpt-oss:120b"
+    # пустой url → облако по умолчанию (api_base_url не задаётся)
+    assert cfg.api_base_url is None
+    # ключ облака — в .env, не в config.json
+    env = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert "OLLAMA_API_KEY=sk-cloud" in env
+    assert "sk-cloud" not in cfg_path.read_text(encoding="utf-8")
+
+
+def test_engine_ollama_models_route(tmp_path: Path, monkeypatch) -> None:
+    import webui.engine_status as es
+
+    monkeypatch.setattr(
+        es, "_default_http_get", lambda url, headers: {"models": [{"name": "gpt-oss:120b"}]}
+    )
+    client = TestClient(create_app(config_path=tmp_path / "config.json"))
+    data = client.get("/engine/ollama/models").json()
+    assert data["models"] == ["gpt-oss:120b"]
 
 
 def test_settings_save_preserves_engine_choice(tmp_path: Path) -> None:
