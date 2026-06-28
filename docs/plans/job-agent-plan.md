@@ -209,9 +209,9 @@ job-agent/
 ## Фаза 3 — Обогащение (милстоун 3)
 
 ### Task 3.1: Сопроводительное
-- [ ] `enrich/cover.py` по `prompts/cover-letter.md`: только `overall >= cover_letter_threshold` и у трека есть шаблон; правит шаблон трека под вакансию; прокидывается в xlsx и кнопку бота.
-- [ ] Тест: ниже порога — пусто; выше — текст на фейк-движке.
-- [ ] Mark completed
+- [x] `enrich/cover.py` по `prompts/cover-letter.md`: только `overall >= cover_letter_threshold` и у трека есть шаблон; правит шаблон трека под вакансию; прокидывается в xlsx и кнопку бота.
+- [x] Тест: ниже порога — пусто; выше — текст на фейк-движке.
+- [x] Mark completed
 
 ### Task 3.2: Контакт-ассист
 - [ ] `enrich/contacts.py` по `prompts/contact-search.md`, только при `enable_contacts`: web-поиск по булевым запросам → кандидаты + черновик, без отправки, парс строгого JSON.
