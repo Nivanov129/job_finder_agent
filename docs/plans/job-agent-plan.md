@@ -102,10 +102,10 @@ job-agent/
 ## Фаза 0 — Каркас
 
 ### Task 0.1: Инициализация проекта
-- [ ] `pyproject.toml` (uv; зависимости: pydantic, httpx, fastembed, openpyxl, python-telegram-bot, telethon, jsonschema; dev: ruff, pytest, mypy), конфиги ruff/pytest, пустой пакет `src/job_agent/`, `README.md` со ссылкой на этот план.
-- [ ] Добавить smoke-тест `tests/test_smoke.py` (чтобы `pytest` собирал ≥1 тест и не падал с exit 5).
-- [ ] `uv sync`; `uv run ruff check src` и `uv run pytest -q` зелёные.
-- [ ] Mark completed
+- [x] `pyproject.toml` (uv; зависимости: pydantic, httpx, fastembed, openpyxl, python-telegram-bot, telethon, jsonschema; dev: ruff, pytest, mypy), конфиги ruff/pytest, пустой пакет `src/job_agent/`, `README.md` со ссылкой на этот план.
+- [x] Добавить smoke-тест `tests/test_smoke.py` (чтобы `pytest` собирал ≥1 тест и не падал с exit 5).
+- [x] `uv sync`; `uv run ruff check src` и `uv run pytest -q` зелёные.
+- [x] Mark completed
 
 ### Task 0.2: Загрузчик конфига
 - [ ] `config.py`: читает JSON, валидирует против `config.schema.json` (jsonschema), возвращает типизированный `Config` (pydantic), хелпер `Config.is_single_track`. Ошибки валидации — внятные.

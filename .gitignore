@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# uv
+# (uv.lock is committed)
+
+# Caches / tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# OS
+.DS_Store
+
+# Local config & data (secrets, seen-store, outputs)
+config.json
+.env
+*.sqlite
+*.sqlite3
+*.xlsx
