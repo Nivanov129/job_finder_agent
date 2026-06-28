@@ -150,9 +150,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 1.6: Нормализация
-- [ ] `normalize.py`: рендерит `prompts/normalize.md`, зовёт движок, парсит строгий JSON в `list[Vacancy]`, устойчиво к мусору (не-вакансия → пусто).
-- [ ] Тест с фейк-движком и фиксированным ответом.
-- [ ] Mark completed
+- [x] `normalize.py`: рендерит `prompts/normalize.md`, зовёт движок, парсит строгий JSON в `list[Vacancy]`, устойчиво к мусору (не-вакансия → пусто).
+- [x] Тест с фейк-движком и фиксированным ответом.
+- [x] Mark completed
 
 ### Task 1.7: Дедуп
 - [ ] `dedup.py`: SQLite seen-store, ключ = хэш `title+company` + url, API `is_seen`/`mark_seen`, кросс-источник, идемпотентно. Путь к БД из конфига/env.
