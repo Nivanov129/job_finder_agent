@@ -117,14 +117,12 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
                 cli_tool=cfg.get("cli_tool", "claude"),
                 ollama_url=cfg.get("api_base_url", "") if se == "ollama" else "",
                 ollama_model=cfg.get("ollama_model", ""),
-                api_base_url=cfg.get("api_base_url", "") if se == "api_key" else "",
                 web_search_url=(cfg.get("web_search") or {}).get("url", ""),
                 has_claude_token=bool(
                     env.get("CLAUDE_CODE_OAUTH_TOKEN") or env.get("ANTHROPIC_API_KEY")
                 ),
                 has_codex_key=bool(env.get("OPENAI_API_KEY")),
                 has_ollama_key=bool(env.get("OLLAMA_API_KEY")),
-                has_api_key=bool(cfg.get("api_key")),
             ),
             scripts='<script src="/static/js/engine.js"></script>',
             active="/engine",
@@ -145,9 +143,7 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
         cfg = _load_raw(target)
         env = {**os.environ, **parse_env(envfile)}
         ollama_url = cfg.get("api_base_url", "") if cfg.get("scoring_engine") == "ollama" else ""
-        statuses = engine_statuses(
-            env=env, ollama_url=ollama_url, has_api_key=bool(cfg.get("api_key"))
-        )
+        statuses = engine_statuses(env=env, ollama_url=ollama_url)
         return JSONResponse({"engines": [s.as_dict() for s in statuses]})
 
     @app.post("/engine/test")

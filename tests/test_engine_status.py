@@ -128,11 +128,11 @@ def test_engine_statuses_threads_ollama_key() -> None:
         return {"models": []}
 
     states = engine_statuses(
-        env={"OLLAMA_API_KEY": "sk"}, ollama_url="", has_api_key=False,
+        env={"OLLAMA_API_KEY": "sk"}, ollama_url="",
         which=_which({"claude", "codex"}), run=_run_ok,
         http_get=http_get,
     )
-    assert [s.key for s in states] == ["claude", "codex", "ollama", "api_key"]
+    assert [s.key for s in states] == ["claude", "codex", "ollama"]
     assert seen["headers"]["authorization"] == "Bearer sk"
 
 

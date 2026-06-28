@@ -42,10 +42,10 @@ CLOUD_BASE_URL = "https://ollama.com"
 class EngineStatus:
     """Состояние одного движка для рендера карточки на странице авторизации."""
 
-    key: str  # claude | codex | ollama | api_key
+    key: str  # claude | codex | ollama
     label: str
-    billing: str  # subscription | free | byo_key
-    installed: bool | None  # None — неприменимо (api_key/ollama не CLI)
+    billing: str  # subscription | free
+    installed: bool | None  # None — неприменимо (ollama не CLI)
     authorized: bool
     detail: str  # короткая подсказка/версия (без секретов)
 
@@ -133,16 +133,10 @@ def ollama_status(
         return EngineStatus("ollama", label, "free", None, False, f"недоступно: {where}")
 
 
-def api_key_status(*, has_key: bool) -> EngineStatus:
-    detail = "ключ задан" if has_key else "вставьте API-ключ ниже"
-    return EngineStatus("api_key", "Свой API-ключ", "byo_key", None, has_key, detail)
-
-
 def engine_statuses(
     *,
     env: Mapping[str, str],
     ollama_url: str = "",
-    has_api_key: bool = False,
     which: WhichFn = shutil.which,
     run: RunFn | None = None,
     http_get: HttpGetFn | None = None,
@@ -157,7 +151,6 @@ def engine_statuses(
         claude_status(which=which, run=run, env=env),
         codex_status(which=which, run=run, env=env),
         ollama_status(ollama_url, api_key=env.get("OLLAMA_API_KEY"), http_get=http_get),
-        api_key_status(has_key=has_api_key),
     ]
 
 

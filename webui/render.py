@@ -283,12 +283,10 @@ def render_engine(
     cli_tool: str = "claude",
     ollama_url: str = "",
     ollama_model: str = "",
-    api_base_url: str = "",
     web_search_url: str = "",
     has_claude_token: bool = False,
     has_codex_key: bool = False,
     has_ollama_key: bool = False,
-    has_api_key: bool = False,
 ) -> str:
     """Экран «AI · авторизация»: выбор движка, статус, авторизация, web-поиск.
 
@@ -298,7 +296,7 @@ def render_engine(
     """
     active = (
         cli_tool if scoring_engine == "cli" else scoring_engine
-    )  # claude|codex|ollama|api_key
+    )  # claude|codex|ollama
 
     choices = (
         _engine_choice("claude", "Claude Code", "claude -p · CLI", "подписка",
@@ -307,8 +305,6 @@ def render_engine(
                          active=active == "codex")
         + _engine_choice("ollama", "Ollama Cloud", "облачные модели", "нужен ключ",
                          active=active == "ollama")
-        + _engine_choice("api_key", "Свой API-ключ", "Anthropic / OpenAI", "свой ключ",
-                         active=active == "api_key")
     )
 
     def secret_field(name: str, label: str, placeholder: str, *, has: bool) -> str:
@@ -370,16 +366,6 @@ def render_engine(
         'placeholder="оставьте пустым для облака · http://host.docker.internal:11434">'
         "</label>",
     )
-    apikey_panel = _auth_panel(
-        "api_key",
-        "Свой API-ключ — оплата по API",
-        "Anthropic или OpenAI по вашему ключу (биллинг по использованию, не подписка).",
-        '<label class="field"><span class="field__label">API base URL</span>'
-        f'<input class="input" name="api_base_url" value="{escape(api_base_url)}" '
-        'placeholder="https://api.anthropic.com"></label>'
-        + secret_field("api_key", "API-ключ", "вставьте ключ", has=has_api_key),
-    )
-
     web = (
         '<section class="card">'
         f'<div class="card__title">{icon("ti-world-search")} Web-поиск</div>'
@@ -397,7 +383,7 @@ def render_engine(
         '<section class="card">'
         f'<div class="card__title">{icon("ti-cpu")} Движок AI</div>'
         f'<div class="engine-grid">{choices}</div>'
-        f"{claude_panel}{codex_panel}{ollama_panel}{apikey_panel}"
+        f"{claude_panel}{codex_panel}{ollama_panel}"
         "</section>"
         + web
         + '<div class="form-footer">'

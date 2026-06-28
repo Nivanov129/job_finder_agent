@@ -151,7 +151,8 @@ def engine_config_from_form(
     секреты не возвращаются, чтобы не затирать ранее заданные.
 
     Маппинг радио `engine` → конфиг: claude/codex → `scoring_engine=cli` +
-    `cli_tool`; ollama → `scoring_engine=ollama`; api_key → `scoring_engine=api_key`.
+    `cli_tool`; ollama → `scoring_engine=ollama`. Движок `api_key` со страницы
+    убран (доступен только ручной правкой config.json).
     """
     engine = _clean(form.get("engine", "")) or "claude"
     config: dict[str, Any] = {}
@@ -179,14 +180,6 @@ def engine_config_from_form(
             config["api_base_url"] = url
         if key:  # ключ Ollama Cloud — секрет, в .env, не в config.json
             secrets["OLLAMA_API_KEY"] = key
-    elif engine == "api_key":
-        config["scoring_engine"] = "api_key"
-        base = _clean(form.get("api_base_url", ""))
-        key = _clean(form.get("api_key", ""))
-        if base:
-            config["api_base_url"] = base
-        if key:  # движок api_key читает config.api_key
-            config["api_key"] = key
 
     # Web-поиск — общий для скоринга (анализ компании/контакты).
     ws_url = _clean(form.get("web_search_url", ""))
