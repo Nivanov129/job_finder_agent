@@ -125,9 +125,9 @@ job-agent/
 ## Фаза 1 — Backfill core (милстоун 1: доказать пайплайн, получить .xlsx за 14 дней)
 
 ### Task 1.1: Интерфейс коллектора + TG публичный
-- [ ] `collectors/base.py` (`Collector.fetch(since)->list[RawPost]`), `collectors/telegram_public.py` (читает `t.me/s/<handle>`, парсит посты, фильтр по дате).
-- [ ] Тест на сохранённом HTML-фикстуре `t.me/s/` в `tests/fixtures/`.
-- [ ] Mark completed
+- [x] `collectors/base.py` (`Collector.fetch(since)->list[RawPost]`), `collectors/telegram_public.py` (читает `t.me/s/<handle>`, парсит посты, фильтр по дате).
+- [x] Тест на сохранённом HTML-фикстуре `t.me/s/` в `tests/fixtures/`.
+- [x] Mark completed
 
 ### Task 1.2: Коллекторы агрегаторов
 - [ ] `collectors/vseti.py`, `collectors/getmatch.py` по тому же интерфейсу. Хрупкость вёрстки изолирована в адаптере.
