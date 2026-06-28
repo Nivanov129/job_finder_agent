@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from job_agent.config import ConfigError, load_config
 from webui.components import chip, icon
 from webui.forms import config_from_form
-from webui.render import render_settings, save_result_page
+from webui.render import render_results, render_settings, save_result_page
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -60,6 +60,12 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
         return page(render_settings(), scripts='<script src="/static/js/settings.js"></script>')
+
+    @app.get("/results", response_class=HTMLResponse)
+    def results() -> str:
+        # Прогоны нигде не персистятся — пока нет данных, показываем пустое
+        # состояние. Карточки собирает чистая `render_results` (юнит-тесты).
+        return page(render_results([]))
 
     @app.post("/save", response_class=HTMLResponse)
     async def save(request: Request) -> HTMLResponse:

@@ -273,3 +273,57 @@ textarea.input {
   gap: 12px;
   justify-content: flex-end;
 }
+
+/* ── Экран 2 «Подборка» (Task 5.2) ────────────────────────────── */
+.run-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.result-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.result-card__right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.result-card__map {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.result-card__gap {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.result-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.result-card__actions .btn {
+  text-decoration: none;
+  font-size: 13px;
+}

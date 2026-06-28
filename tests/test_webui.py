@@ -7,13 +7,24 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from webui import create_app
 from webui.components import badge, card, chip, track_tag, verdict_line
+from webui.render import render_results, vacancy_card
 
+from job_agent.models import (
+    EnrichedResult,
+    Gaps,
+    Requirements,
+    ScoreResult,
+    Scores,
+    Vacancy,
+    Verdict,
+)
 from job_agent.presentation import BADGE_COLORS, TRACK_TAG_COLORS
 
 STATIC = Path(__file__).resolve().parents[1] / "webui" / "static"
@@ -234,3 +245,139 @@ def test_save_invalid_config_rejected_keeps_no_file(tmp_path: Path) -> None:
     assert r.status_code == 400
     assert "не сохранён" in r.text
     assert not cfg_path.exists()  # битый сабмит не создаёт файл
+
+
+# ── Экран 2 «Подборка» (Task 5.2) ─────────────────────────────────
+
+
+def _enriched(
+    *,
+    title: str = "Backend Engineer",
+    overall: int = 86,
+    map_fit: int = 60,
+    track: str = "Бэкенд",
+    verdict_type: str = "precise_fit",
+    summary: str = "точное попадание",
+    company: str | None = "Acme",
+    link: str | None = "@hr",
+    url: str | None = "https://t.me/jobs/1",
+    cover_letter: str | None = None,
+    critical: list[str] | None = None,
+) -> EnrichedResult:
+    vacancy = Vacancy(
+        title=title,
+        company=company,
+        link_or_contact=link,
+        salary="300к",
+        description="desc",
+        source="@jobs",
+        url=url,
+        date=datetime(2026, 6, 1, 12, 0),
+    )
+    score = ScoreResult(
+        track=track,
+        company_analysis="scaleup",
+        company_confidence="medium",
+        requirements=Requirements(must=["Python"], nice=["k8s"]),
+        matching=[],
+        scores=Scores(
+            must=80, nice=50, seniority=70, context=65, overall=overall, map_fit=map_fit
+        ),
+        score_method="среднее",
+        gaps=Gaps(
+            critical=["нет k8s"] if critical is None else critical,
+            strategic=["масштаб"],
+            cosmetic=[],
+        ),
+        to_reach_100=[],
+        verdict=Verdict(
+            should_apply=True,
+            type=verdict_type,
+            hr_screening_probability="high",
+            final_stage_probability="medium",
+            summary=summary,
+        ),
+    )
+    return EnrichedResult(vacancy=vacancy, score=score, cover_letter=cover_letter)
+
+
+def test_vacancy_card_inventory() -> None:
+    html = vacancy_card(_enriched(overall=86, map_fit=72))
+    # должность, мета (компания · стадия), бейдж зелёного диапазона, карта
+    assert "Backend Engineer" in html
+    assert "Acme · scaleup" in html
+    assert BADGE_COLORS["green"].bg in html
+    assert "ti-map-2" in html and "карта 72%" in html
+    # вердикт точного попадания с иконкой и кнопка «Открыть»
+    assert "ti-circle-check" in html
+    assert "ti-external-link" in html and "Открыть" in html
+    # гэп
+    assert "Гэп: нет k8s" in html
+
+
+def test_vacancy_card_track_tag_hidden_when_single() -> None:
+    multi = vacancy_card(_enriched(track="Бэкенд"), is_single_track=False)
+    single = vacancy_card(_enriched(track="Бэкенд"), is_single_track=True)
+    assert "track-tag" in multi and "Бэкенд" in multi
+    assert "track-tag" not in single
+
+
+def test_vacancy_card_cover_button_conditional() -> None:
+    # выше порога + есть письмо → кнопка «Сопроводительное»
+    above = vacancy_card(
+        _enriched(overall=85, cover_letter="Здравствуйте..."),
+        cover_letter_threshold=70,
+    )
+    assert "Сопроводительное" in above and "ti-copy" in above
+    # ниже порога → кнопки нет, даже если письмо есть
+    below = vacancy_card(
+        _enriched(overall=60, cover_letter="Здравствуйте..."),
+        cover_letter_threshold=70,
+    )
+    assert "Сопроводительное" not in below
+    # выше порога, но письма нет → кнопки нет
+    no_letter = vacancy_card(
+        _enriched(overall=85, cover_letter=None), cover_letter_threshold=70
+    )
+    assert "Сопроводительное" not in no_letter
+
+
+def test_render_results_sorted_and_header() -> None:
+    results = [
+        _enriched(title="Low", overall=55),
+        _enriched(title="High", overall=92),
+        _enriched(title="Mid", overall=74),
+    ]
+    html = render_results(
+        results, run_date="28.06.2026", collected=120, after_filter=18
+    )
+    # шапка прогона со статистикой и кнопкой скачивания
+    assert "Подборка · 28.06.2026" in html
+    assert "собрано 120 · после фильтра 18 · топ-3" in html
+    assert "ti-download" in html and "Скачать .xlsx" in html
+    # карточки по убыванию overall
+    assert html.index("High") < html.index("Mid") < html.index("Low")
+
+
+def test_render_results_empty_state() -> None:
+    html = render_results([])
+    assert "topbar" not in html  # просто гладкий рендер
+    assert "Прогон ещё не выполнялся" in html
+    assert "собрано 0 · после фильтра 0 · топ-0" in html
+
+
+def test_render_results_top_k_limits_shown() -> None:
+    results = [_enriched(title=f"V{i}", overall=90 - i) for i in range(5)]
+    html = render_results(results, top_k=2)
+    assert "топ-2" in html
+    assert "V0" in html and "V1" in html
+    assert "V4" not in html
+
+
+def test_results_route_renders(client: TestClient) -> None:
+    r = client.get("/results")
+    assert r.status_code == 200
+    assert "text/html" in r.headers["content-type"]
+    body = r.text
+    assert "Подборка" in body
+    assert 'class="col"' in body or "class=col" in body
