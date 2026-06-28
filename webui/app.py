@@ -178,6 +178,7 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
                 "подхватит его после перезапуска стека: "
                 "<code>docker compose up -d</code>."
             )
+        verify_engine = str(form.get("engine", "")) or "claude"
         return HTMLResponse(
             page(
                 save_result_page(
@@ -186,8 +187,10 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
                     note_html=note_html,
                     back_href="/engine",
                     back_label="вернуться к движку",
+                    verify_engine=verify_engine,
                 ),
                 active="/engine",
+                scripts='<script src="/static/js/engine.js"></script>',
             )
         )
 

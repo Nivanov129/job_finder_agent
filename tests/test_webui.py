@@ -404,6 +404,24 @@ def test_engine_save_ollama_cloud_key_to_env_not_config(tmp_path: Path) -> None:
     assert "sk-cloud" not in cfg_path.read_text(encoding="utf-8")
 
 
+def test_engine_page_has_login_wizard(client: TestClient) -> None:
+    body = client.get("/engine").text
+    # нумерованный гайд + кнопки «копировать команду»
+    assert 'class="auth-steps"' in body
+    assert 'data-copy="claude setup-token"' in body
+    assert 'data-copy="codex login"' in body
+
+
+def test_engine_save_triggers_autoverify(tmp_path: Path) -> None:
+    client = TestClient(create_app(config_path=tmp_path / "config.json"))
+    _seed_config(client)
+    r = client.post("/engine/save", data={"engine": "claude", "claude_token": "tok"})
+    assert r.status_code == 200
+    # страница-подтверждение сама гоняет «Проверить» для сохранённого движка
+    assert 'data-autoverify="claude"' in r.text
+    assert "/static/js/engine.js" in r.text  # скрипт авто-проверки подключён
+
+
 def test_engine_save_secret_shows_restart_hint(tmp_path: Path) -> None:
     client = TestClient(create_app(config_path=tmp_path / "config.json"))
     _seed_config(client)

@@ -246,6 +246,21 @@ def _engine_choice(value: str, title: str, meta: str, badge_text: str, *, active
     )
 
 
+def _copy_cmd(cmd: str) -> str:
+    """Команда с кнопкой «копировать» (JS пишет в буфер; без CDN)."""
+    return (
+        f'<span class="cmd"><code>{escape(cmd)}</code>'
+        f'<button type="button" class="copy-cmd" data-copy="{escape(cmd)}" '
+        f'title="копировать">{icon("ti-copy")}</button></span>'
+    )
+
+
+def _login_steps(steps: list[str]) -> str:
+    """Нумерованный гайд входа (шаги уже содержат готовый HTML)."""
+    items = "".join(f"<li>{s}</li>" for s in steps)
+    return f'<ol class="auth-steps">{items}</ol>'
+
+
 def _auth_panel(key: str, title: str, hint_html: str, fields_html: str) -> str:
     """Панель авторизации движка: статус-пилюли (JS заполнит) + поля/подсказки."""
     return (
@@ -307,25 +322,41 @@ def render_engine(
     claude_panel = _auth_panel(
         "claude",
         "Claude Code — нужна подписка Pro/Max",
-        "Установлен в образе. Авторизация: на хосте выполните "
-        "<code>claude setup-token</code> и вставьте токен (живёт ~1 год), либо "
-        "переиспользуйте host-логин (JOB_AGENT_CLAUDE_DIR).",
+        _login_steps([
+            f"На хосте в терминале выполните {_copy_cmd('claude setup-token')} — "
+            "откроется вход через браузер.",
+            "Авторизуйтесь в Claude (нужна подписка Pro/Max).",
+            "Скопируйте показанный токен (живёт ~1 год) и вставьте в поле ниже.",
+            "«Сохранить» — токен проверится автоматически.",
+        ])
+        + '<div class="auth-panel__sub">Уже залогинены на хосте? Можно '
+        "переиспользовать вход через <code>JOB_AGENT_CLAUDE_DIR</code> — "
+        "тогда поле токена не нужно.</div>",
         secret_field("claude_token", "CLAUDE_CODE_OAUTH_TOKEN", "вставьте токен",
                      has=has_claude_token),
     )
     codex_panel = _auth_panel(
         "codex",
         "Codex — нужна подписка",
-        "Установлен в образе. Авторизация: <code>codex login</code> в "
-        "смонтированном каталоге, либо ключ OPENAI_API_KEY ниже.",
+        _login_steps([
+            f"Выполните {_copy_cmd('codex login')} — вход через браузер "
+            f"(или сразу ключом: {_copy_cmd('codex login --api-key КЛЮЧ')}).",
+            "Авторизуйтесь (нужна подписка) — либо вставьте ключ "
+            "<code>OPENAI_API_KEY</code> в поле ниже.",
+            "«Сохранить» — проверится автоматически.",
+        ]),
         secret_field("codex_key", "OPENAI_API_KEY", "вставьте ключ", has=has_codex_key),
     )
     ollama_panel = _auth_panel(
         "ollama",
         "Ollama Cloud — облачные модели, нужен ключ",
-        "Большие модели в облаке без локального GPU. Ключ — на "
-        "<code>ollama.com/settings/keys</code>, вставьте ниже (живёт в .env). "
-        "Свой/локальный сервер — укажите его URL, тогда ключ не нужен.",
+        _login_steps([
+            f"Создайте ключ на {_copy_cmd('ollama.com/settings/keys')} "
+            "и вставьте его в поле ниже (живёт в .env).",
+            "Выберите модель из списка (подтянется с сервера) или впишите вручную.",
+            f"Свой/локальный сервер? Укажите его URL "
+            f"({_copy_cmd('http://host.docker.internal:11434')}) — ключ не нужен.",
+        ]),
         secret_field("ollama_key", "OLLAMA_API_KEY", "вставьте ключ облака",
                      has=has_ollama_key)
         + '<label class="field"><span class="field__label">Модель</span>'
@@ -592,11 +623,14 @@ def save_result_page(
     note_html: str = "",
     back_href: str = "/",
     back_label: str = "вернуться к настройке",
+    verify_engine: str = "",
 ) -> str:
     """Страница-подтверждение после сабмита формы.
 
     `note_html` — доверенная HTML-подсказка (строится маршрутом, напр. про
     перезапуск стека после смены ключа). `back_href`/`back_label` — ссылка назад.
+    `verify_engine` — если задан, страница сразу гоняет «Проверить» для движка
+    (engine.js ловит `data-autoverify`), показывая результат пробы инлайн.
     """
     back = f'<p><a href="{escape(back_href)}">← {escape(back_label)}</a></p>'
     if not ok:
@@ -611,10 +645,16 @@ def save_result_page(
         else ""
     )
     note = f'<div class="card__meta">{note_html}</div>' if note_html else ""
+    verify = (
+        f'<div class="autoverify" data-autoverify="{escape(verify_engine)}">'
+        f'{icon("ti-plug-connected")} Проверяю движок…</div>'
+        if verify_engine
+        else ""
+    )
     return (
         '<div class="card">'
         f'<div class="card__title">{icon("ti-circle-check")} Конфиг сохранён</div>'
         f'<div class="card__meta">{escape(path)}.{started}</div>'
-        f"{note}"
+        f"{note}{verify}"
         f"</div>{back}"
     )

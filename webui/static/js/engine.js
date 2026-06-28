@@ -64,31 +64,55 @@
       .catch(function () {});
   }
 
-  document.addEventListener("click", function (ev) {
-    var btn = ev.target.closest(".engine-test");
-    if (!btn) return;
-    var key = btn.getAttribute("data-engine");
-    var out = document.querySelector('[data-test="' + key + '"]');
-    if (out) { out.textContent = "Проверяю…"; out.className = "path-input__status"; }
+  // Реальная мини-проба движка: пишет результат в `out` (✓/✗ + сообщение).
+  function runProbe(key, out, okClass, errClass) {
+    if (out) { out.textContent = "Проверяю…"; out.className = okClass; }
     var fd = new FormData();
     fd.append("engine", key);
-    fetch("/engine/test", { method: "POST", body: fd })
+    return fetch("/engine/test", { method: "POST", body: fd })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
       .then(function (res) {
         if (!out) return;
         if (res.ok) {
           out.textContent = "✓ " + (res.body.message || "ok");
-          out.className = "path-input__status is-ok";
+          out.className = okClass + " is-ok";
         } else {
           out.textContent = "✗ " + (res.body.message || "ошибка");
-          out.className = "path-input__status is-error";
+          out.className = okClass + " is-error";
         }
       })
       .catch(function () {
-        if (out) { out.textContent = "✗ сеть"; out.className = "path-input__status is-error"; }
+        if (out) { out.textContent = "✗ сеть"; out.className = okClass + " is-error"; }
       });
+  }
+
+  document.addEventListener("click", function (ev) {
+    // Кнопка «копировать команду».
+    var copyBtn = ev.target.closest(".copy-cmd");
+    if (copyBtn) {
+      var text = copyBtn.getAttribute("data-copy") || "";
+      if (navigator.clipboard) navigator.clipboard.writeText(text).catch(function () {});
+      var prev = copyBtn.getAttribute("title");
+      copyBtn.setAttribute("title", "скопировано ✓");
+      setTimeout(function () { copyBtn.setAttribute("title", prev || "копировать"); }, 1500);
+      return;
+    }
+    // Кнопка «Проверить» на панели движка.
+    var btn = ev.target.closest(".engine-test");
+    if (!btn) return;
+    var key = btn.getAttribute("data-engine");
+    runProbe(key, document.querySelector('[data-test="' + key + '"]'), "path-input__status");
   });
+
+  // Авто-проверка после сохранения: страница-подтверждение несёт data-autoverify.
+  function autoVerify() {
+    var el = document.querySelector("[data-autoverify]");
+    if (!el) return;
+    var key = el.getAttribute("data-autoverify");
+    if (key) runProbe(key, el, "autoverify");
+  }
 
   loadStatus();
   loadOllamaModels();
+  autoVerify();
 })();
