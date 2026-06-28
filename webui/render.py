@@ -549,31 +549,40 @@ def render_results_screen() -> str:
 
 
 def render_agent() -> str:
-    """Экран «Агент» (дашборд авто-поиска). Данные наполняет agent.js."""
-    return (
-        '<div class="app-header">'
-        f'<span class="app-header__icon">{icon("ti-radar-2")}</span>'
-        '<div><div class="card__title" data-agent-title>Агент</div>'
-        '<div class="card__meta" data-agent-subtitle>авто-поиск вакансий под твоё '
-        "резюме в реальном времени</div></div></div>"
-        # сводка-конвейер
-        '<section class="card pipeline" data-agent-pipe></section>'
-        # лента + правая колонка
-        '<div class="agent-grid">'
-        '<section class="card feed-card">'
-        '<div class="feed-card__head">'
-        f'<span class="card__title">{icon("ti-activity-heartbeat")} Лента · '
-        'оценивается на лету</span>'
-        '<span class="live-tag" data-agent-live>live</span></div>'
+    """Экран «Агент» (дашборд авто-поиска) — каркас, данные наполняет agent.js."""
+    hero = (
+        '<div class="hero">'
+        f'<div class="hero__l"><div class="hero__icon" data-agent-hicon>{icon("ti-radar-2")}'
+        "</div><div><div class=\"hero__title\" data-agent-title>Агент</div>"
+        '<div class="hero__sub" data-agent-subtitle>загрузка…</div></div></div>'
+        '<button type="button" class="btn btn--accent hero__toggle agent-toggle" '
+        'data-agent-toggle></button></div>'
+    )
+    feed_card = (
+        '<section class="card feed-card"><div class="feed-card__head">'
+        '<span class="card__title"><span class="orb" data-agent-orb></span> '
+        "Входящие · AI оценивает на лету</span>"
+        '<span class="feed-rate mono" data-agent-rate></span></div>'
         '<div class="feed" data-agent-feed></div></section>'
-        '<div class="agent-side">'
-        '<section class="card">'
-        f'<div class="card__title">{icon("ti-sparkles")} Свежие совпадения</div>'
-        '<div class="matches" data-agent-matches></div></section>'
-        '<section class="card">'
-        f'<div class="card__title">{icon("ti-chart-bar")} Статистика</div>'
-        '<div class="stats" data-agent-stats></div></section>'
-        "</div></div>"
+    )
+    host_card = (
+        '<section class="card"><div class="host-detail__head">'
+        '<span class="card__title">Хост</span>'
+        '<span class="mode-chip" data-agent-hostbadge></span></div>'
+        '<div class="host-detail" data-agent-hostdetail></div></section>'
+    )
+    pushes_card = (
+        '<section class="card"><div class="pushes__head">'
+        f'{icon("ti-bell-ringing")}<span class="card__title">Сильные совпадения</span>'
+        '<span class="pushes__count" data-agent-pushcount>0</span></div>'
+        '<div class="pushes" data-agent-pushes></div></section>'
+    )
+    return (
+        hero
+        + '<div class="stat-grid" data-agent-stats></div>'
+        + '<div class="agent-cols">'
+        + feed_card
+        + '<div class="agent-side">' + host_card + pushes_card + "</div></div>"
     )
 
 
