@@ -99,7 +99,6 @@ def config_from_form(form: FormLike) -> dict[str, Any]:
     data: dict[str, Any] = {
         "version": 1,
         "tracks": _tracks_from_form(form),
-        "scoring_engine": _clean(form.get("engine", "cli")) or "cli",
         "output_mode": _output_mode(form),
     }
 
@@ -122,35 +121,8 @@ def config_from_form(form: FormLike) -> dict[str, Any]:
         data["tg_channels"] = channels
     data["use_aggregators"] = bool(form.get("use_aggregators"))
 
-    # Движок AI — поля только для выбранного движка.
-    engine = data["scoring_engine"]
-    if engine == "cli":
-        cli_tool = _clean(form.get("cli_tool", ""))
-        if cli_tool:
-            data["cli_tool"] = cli_tool
-    elif engine == "api_key":
-        api_base = _clean(form.get("api_base_url", ""))
-        api_key = _clean(form.get("api_key", ""))
-        if api_base:
-            data["api_base_url"] = api_base
-        if api_key:
-            data["api_key"] = api_key
-    elif engine == "ollama":
-        ollama_model = _clean(form.get("ollama_model", ""))
-        if ollama_model:
-            data["ollama_model"] = ollama_model
-
-    # Web-поиск.
-    ws_url = _clean(form.get("web_search_url", ""))
-    ws_provider = _clean(form.get("web_search_provider", "")) or "searxng"
-    ws_key = _clean(form.get("web_search_api_key", ""))
-    if ws_url or ws_key:
-        web_search: dict[str, Any] = {"provider": ws_provider}
-        if ws_url:
-            web_search["url"] = ws_url
-        if ws_key:
-            web_search["api_key"] = ws_key
-        data["web_search"] = web_search
+    # Движок AI и web-поиск — на отдельной странице (engine_config_from_form),
+    # сюда не входят: сохранение Настройки мержится в конфиг, не трогая движок.
 
     # Выхлоп и пороги.
     threshold = _clean(form.get("cover_threshold", ""))
@@ -166,3 +138,56 @@ def config_from_form(form: FormLike) -> dict[str, Any]:
     data["enable_contacts"] = bool(form.get("enable_contacts"))
 
     return data
+
+
+def engine_config_from_form(
+    form: FormLike,
+) -> tuple[dict[str, Any], dict[str, str | None]]:
+    """Разобрать форму страницы «AI · авторизация».
+
+    Возвращает (`config_subset`, `secrets`): первое мержится в `config.json`
+    (выбор движка, cli_tool, ollama/api поля, web-поиск), второе пишется в
+    `.env` (токены/ключи авторизации — CLI читают их из окружения). Пустые
+    секреты не возвращаются, чтобы не затирать ранее заданные.
+
+    Маппинг радио `engine` → конфиг: claude/codex → `scoring_engine=cli` +
+    `cli_tool`; ollama → `scoring_engine=ollama`; api_key → `scoring_engine=api_key`.
+    """
+    engine = _clean(form.get("engine", "")) or "claude"
+    config: dict[str, Any] = {}
+    secrets: dict[str, str | None] = {}
+
+    if engine in ("claude", "codex"):
+        config["scoring_engine"] = "cli"
+        config["cli_tool"] = engine
+        if engine == "claude":
+            token = _clean(form.get("claude_token", ""))
+            if token:
+                secrets["CLAUDE_CODE_OAUTH_TOKEN"] = token
+        else:
+            key = _clean(form.get("codex_key", ""))
+            if key:
+                secrets["OPENAI_API_KEY"] = key
+    elif engine == "ollama":
+        config["scoring_engine"] = "ollama"
+        model = _clean(form.get("ollama_model", ""))
+        url = _clean(form.get("ollama_url", ""))
+        if model:
+            config["ollama_model"] = model
+        if url:
+            config["api_base_url"] = url
+    elif engine == "api_key":
+        config["scoring_engine"] = "api_key"
+        base = _clean(form.get("api_base_url", ""))
+        key = _clean(form.get("api_key", ""))
+        if base:
+            config["api_base_url"] = base
+        if key:  # движок api_key читает config.api_key
+            config["api_key"] = key
+
+    # Web-поиск — общий для скоринга (анализ компании/контакты).
+    ws_url = _clean(form.get("web_search_url", ""))
+    if ws_url:
+        config["web_search"] = {"provider": "searxng", "url": ws_url}
+
+    return config, secrets

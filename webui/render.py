@@ -18,10 +18,11 @@ from html import escape
 
 from job_agent.models import EnrichedResult
 from job_agent.presentation import DEFAULT_AMBER_MIN, DEFAULT_GREEN_MIN
-from webui.components import badge, icon, track_tag, verdict_line
+from webui.components import badge, icon, status_pill, track_tag, verdict_line
 
 __all__ = [
     "render_settings",
+    "render_engine",
     "path_field",
     "track_card",
     "save_result_page",
@@ -168,41 +169,16 @@ def _sources_card() -> str:
     )
 
 
-def _engine_card() -> str:
-    def opt(value: str, title: str, meta: str, *, default: bool = False) -> str:
-        checked = " checked" if default else ""
-        badge = '<span class="badge-default">дефолт</span>' if default else ""
-        return (
-            '<label class="engine-card">'
-            f'<input type="radio" name="engine" value="{value}"{checked}>'
-            f'<span class="engine-card__title">{title}{badge}</span>'
-            f'<span class="engine-card__meta">{meta}</span>'
-            "</label>"
-        )
-
-    cards = (
-        opt("cli", "CLI на подписке", "Claude Code / Codex", default=True)
-        + opt("api_key", "Свой ключ", "Anthropic / OpenAI")
-        + opt("ollama", "Ollama", "локальная модель")
-    )
-    extra = (
-        '<input class="input" name="cli_tool" placeholder="claude или codex (для CLI)">'
-        '<input class="input" name="api_base_url" placeholder="API base URL (для ключа)">'
-        '<input class="input" name="api_key" type="password" placeholder="API ключ (секрет)">'
-        '<input class="input" name="ollama_model" placeholder="llama3.1:70b (для Ollama)">'
-    )
-    web = (
-        '<div class="field__label">Web-поиск</div>'
-        '<input class="input" name="web_search_url" '
-        'placeholder="http://localhost:8080 — SearXNG self-host">'
-    )
+def _engine_pointer() -> str:
+    """Указатель на отдельную страницу настройки движка/авторизации."""
     return (
         '<section class="card">'
         f'<div class="card__title">{icon("ti-cpu")} Движок AI</div>'
-        f'<div class="engine-grid">{cards}</div>'
-        f'<div class="engine-extra">{extra}</div>'
-        + web
-        + "</section>"
+        '<div class="card__meta">Выбор движка (Claude / Codex / Ollama / свой ключ), '
+        "авторизация и web-поиск — на отдельной странице.</div>"
+        '<a class="btn btn--ghost" href="/engine">'
+        f'{icon("ti-arrow-right")} Открыть «AI · авторизация»</a>'
+        "</section>"
     )
 
 
@@ -247,10 +223,157 @@ def render_settings() -> str:
         + '<form method="post" action="/save">'
         + _profile_card()
         + _sources_card()
-        + _engine_card()
+        + _engine_pointer()
         + _output_card()
         + _footer()
         + "</form>"
+    )
+
+
+# ── Экран «AI · авторизация» ───────────────────────────────────────
+
+
+def _engine_choice(value: str, title: str, meta: str, badge_text: str, *, active: bool) -> str:
+    """Радио-карточка выбора движка с пометкой биллинга (подписка/бесплатно)."""
+    checked = " checked" if active else ""
+    return (
+        '<label class="engine-card">'
+        f'<input type="radio" name="engine" value="{value}"{checked}>'
+        f'<span class="engine-card__title">{title}'
+        f'<span class="badge-default">{escape(badge_text)}</span></span>'
+        f'<span class="engine-card__meta">{escape(meta)}</span>'
+        "</label>"
+    )
+
+
+def _auth_panel(key: str, title: str, hint_html: str, fields_html: str) -> str:
+    """Панель авторизации движка: статус-пилюли (JS заполнит) + поля/подсказки."""
+    return (
+        f'<div class="auth-panel" data-engine="{key}">'
+        f'<div class="auth-panel__head"><span class="auth-panel__title">{escape(title)}</span>'
+        f'<span class="auth-panel__status" data-status="{key}">'
+        f'{status_pill(ok=False, text="проверяю…", unknown=True)}</span></div>'
+        f'<div class="auth-panel__hint">{hint_html}</div>'
+        f"{fields_html}"
+        '<button type="button" class="btn engine-test" '
+        f'data-engine="{key}">{icon("ti-plug-connected")} Проверить</button>'
+        '<span class="path-input__status" data-test="' + key + '"></span>'
+        "</div>"
+    )
+
+
+def render_engine(
+    *,
+    scoring_engine: str = "cli",
+    cli_tool: str = "claude",
+    ollama_url: str = "",
+    ollama_model: str = "",
+    api_base_url: str = "",
+    web_search_url: str = "",
+    has_claude_token: bool = False,
+    has_codex_key: bool = False,
+    has_api_key: bool = False,
+) -> str:
+    """Экран «AI · авторизация»: выбор движка, статус, авторизация, web-поиск.
+
+    Текущие значения берутся из конфига; статусы установлен/авторизован
+    заполняет JS из `/engine/status`. Секреты в значения полей не подставляются —
+    только пометка «уже задан», чтобы не светить токены в HTML.
+    """
+    active = (
+        cli_tool if scoring_engine == "cli" else scoring_engine
+    )  # claude|codex|ollama|api_key
+
+    choices = (
+        _engine_choice("claude", "Claude Code", "claude -p · CLI", "подписка",
+                       active=active == "claude")
+        + _engine_choice("codex", "Codex", "codex exec · CLI", "подписка",
+                         active=active == "codex")
+        + _engine_choice("ollama", "Ollama", "локальная модель", "бесплатно",
+                         active=active == "ollama")
+        + _engine_choice("api_key", "Свой API-ключ", "Anthropic / OpenAI", "свой ключ",
+                         active=active == "api_key")
+    )
+
+    def secret_field(name: str, label: str, placeholder: str, *, has: bool) -> str:
+        note = ' <span class="hint-set">уже задан ✓</span>' if has else ""
+        return (
+            f'<label class="field"><span class="field__label">{label}{note}</span>'
+            f'<input class="input" type="password" name="{name}" placeholder="{placeholder}">'
+            "</label>"
+        )
+
+    claude_panel = _auth_panel(
+        "claude",
+        "Claude Code — нужна подписка Pro/Max",
+        "Установлен в образе. Авторизация: на хосте выполните "
+        "<code>claude setup-token</code> и вставьте токен (живёт ~1 год), либо "
+        "переиспользуйте host-логин (JOB_AGENT_CLAUDE_DIR).",
+        secret_field("claude_token", "CLAUDE_CODE_OAUTH_TOKEN", "вставьте токен",
+                     has=has_claude_token),
+    )
+    codex_panel = _auth_panel(
+        "codex",
+        "Codex — нужна подписка",
+        "Установлен в образе. Авторизация: <code>codex login</code> в "
+        "смонтированном каталоге, либо ключ OPENAI_API_KEY ниже.",
+        secret_field("codex_key", "OPENAI_API_KEY", "вставьте ключ", has=has_codex_key),
+    )
+    ollama_panel = _auth_panel(
+        "ollama",
+        "Ollama — бесплатно, локально",
+        "Авторизация не нужна — укажите адрес сервера Ollama "
+        "(из контейнера обычно <code>http://host.docker.internal:11434</code>) и модель.",
+        '<label class="field"><span class="field__label">URL сервера</span>'
+        f'<input class="input" name="ollama_url" value="{escape(ollama_url)}" '
+        'placeholder="http://host.docker.internal:11434"></label>'
+        '<label class="field"><span class="field__label">Модель</span>'
+        f'<input class="input" name="ollama_model" value="{escape(ollama_model)}" '
+        'placeholder="llama3.1:70b"></label>',
+    )
+    apikey_panel = _auth_panel(
+        "api_key",
+        "Свой API-ключ — оплата по API",
+        "Anthropic или OpenAI по вашему ключу (биллинг по использованию, не подписка).",
+        '<label class="field"><span class="field__label">API base URL</span>'
+        f'<input class="input" name="api_base_url" value="{escape(api_base_url)}" '
+        'placeholder="https://api.anthropic.com"></label>'
+        + secret_field("api_key", "API-ключ", "вставьте ключ", has=has_api_key),
+    )
+
+    web = (
+        '<section class="card">'
+        f'<div class="card__title">{icon("ti-world-search")} Web-поиск</div>'
+        '<div class="card__meta">Для анализа компании и контактов на стадии скоринга '
+        "(self-host SearXNG).</div>"
+        '<label class="field"><span class="field__label">URL SearXNG</span>'
+        f'<input class="input" name="web_search_url" value="{escape(web_search_url)}" '
+        'placeholder="http://searxng:8080"></label>'
+        "</section>"
+    )
+
+    return (
+        _engine_header()
+        + '<form method="post" action="/engine/save">'
+        '<section class="card">'
+        f'<div class="card__title">{icon("ti-cpu")} Движок AI</div>'
+        f'<div class="engine-grid">{choices}</div>'
+        f"{claude_panel}{codex_panel}{ollama_panel}{apikey_panel}"
+        "</section>"
+        + web
+        + '<div class="form-footer">'
+        '<button type="submit" class="btn btn--accent">Сохранить</button></div>'
+        "</form>"
+    )
+
+
+def _engine_header() -> str:
+    return (
+        '<div class="app-header">'
+        f'<span class="app-header__icon">{icon("ti-cpu")}</span>'
+        '<div><div class="card__title">AI · авторизация</div>'
+        '<div class="card__meta">движок скоринга и доступ к нему — локально</div></div>'
+        "</div>"
     )
 
 

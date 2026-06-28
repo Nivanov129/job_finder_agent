@@ -149,10 +149,11 @@ def test_settings_screen_inventory(client: TestClient) -> None:
     assert 'id="tracks-list"' in body
     assert 'id="add-track"' in body
     assert 'id="track-template"' in body
-    # движок AI: три карточки, CLI дефолт с бейджем
-    for value in ('value="cli"', 'value="api_key"', 'value="ollama"'):
-        assert value in body
-    assert "дефолт" in body
+    # движок AI вынесен на отдельную страницу — здесь только указатель
+    assert 'href="/engine"' in body
+    assert 'name="engine"' not in body  # карточек движка на Настройке больше нет
+    # верхнее меню-навигация присутствует на экране
+    assert 'class="nav"' in body and "AI · авторизация" in body
     # выхлоп: чипы и слайдер порога с живым %
     assert 'name="out_table"' in body and 'name="out_bot"' in body
     assert 'name="cover_threshold"' in body
@@ -258,11 +259,18 @@ def test_upload_then_path_used_in_valid_config(tmp_path: Path) -> None:
     assert cfg.tracks[0].resume_path == "uploads/resumes/cv.pdf"
 
 
-def test_settings_default_engine_is_cli(client: TestClient) -> None:
-    body = client.get("/").text
-    # дефолтный движок отмечен checked именно на CLI
-    cli = body.split('value="cli"', 1)[1][:40]
-    assert "checked" in cli
+def test_engine_page_default_is_claude(client: TestClient) -> None:
+    body = client.get("/engine").text
+    # дефолтный движок на странице AI — Claude (checked)
+    claude = body.split('value="claude"', 1)[1][:40]
+    assert "checked" in claude
+    # четыре движка + пометки биллинга (подписка/бесплатно/свой ключ)
+    for value in ('value="claude"', 'value="codex"', 'value="ollama"', 'value="api_key"'):
+        assert value in body
+    assert "подписка" in body and "бесплатно" in body
+    # статус подтягивается локальным engine.js, без CDN
+    assert "/static/js/engine.js" in body
+    assert "cdn.jsdelivr.net" not in body
 
 
 def _single_track_form() -> dict[str, str]:
@@ -314,8 +322,6 @@ def test_save_three_tracks_writes_valid_config(tmp_path: Path) -> None:
         "track_resume": ["./r/backend.pdf", "./r/scaleup.pdf", "./r/ai.pdf"],
         "track_template": ["", "", ""],
         "track_roles": ["", "", ""],
-        "engine": "ollama",
-        "ollama_model": "llama3.1:70b",
         "out_table": "on",
         "cover_threshold": "70",
         "action": "backfill",
@@ -327,7 +333,76 @@ def test_save_three_tracks_writes_valid_config(tmp_path: Path) -> None:
     ids = [t.id for t in cfg.tracks]
     assert ids == ["backend", "track-2", "ai"]  # кириллица схлопывается в фолбэк
     assert cfg.output_mode == "table"
-    assert cfg.scoring_engine == "ollama" and cfg.ollama_model == "llama3.1:70b"
+    # движок не задаётся на Настройке → дефолт cli/claude (правится на /engine)
+    assert cfg.scoring_engine == "cli" and cfg.cli_tool == "claude"
+
+
+def _seed_config(client: TestClient) -> None:
+    """Сохранить минимальную валидную Настройку (нужны треки для валидности)."""
+    assert client.post("/save", data=_single_track_form()).status_code == 200
+
+
+def test_engine_save_codex_writes_config_and_secret(tmp_path: Path) -> None:
+    from job_agent.config import load_config
+
+    cfg_path = tmp_path / "config.json"
+    client = TestClient(create_app(config_path=cfg_path))
+    _seed_config(client)
+    r = client.post(
+        "/engine/save", data={"engine": "codex", "codex_key": "sk-test-123"}
+    )
+    assert r.status_code == 200
+    cfg = load_config(cfg_path)
+    assert cfg.scoring_engine == "cli" and cfg.cli_tool == "codex"
+    # секрет — в .env, НЕ в config.json
+    env = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert "OPENAI_API_KEY=sk-test-123" in env
+    assert "sk-test-123" not in cfg_path.read_text(encoding="utf-8")
+    # треки из Настройки не потеряны при мерже
+    assert len(cfg.tracks) == 1
+
+
+def test_engine_save_ollama_uses_url_and_model(tmp_path: Path) -> None:
+    from job_agent.config import load_config
+
+    cfg_path = tmp_path / "config.json"
+    client = TestClient(create_app(config_path=cfg_path))
+    _seed_config(client)
+    r = client.post(
+        "/engine/save",
+        data={
+            "engine": "ollama",
+            "ollama_url": "http://host.docker.internal:11434",
+            "ollama_model": "llama3.1:70b",
+        },
+    )
+    assert r.status_code == 200
+    cfg = load_config(cfg_path)
+    assert cfg.scoring_engine == "ollama"
+    assert cfg.ollama_model == "llama3.1:70b"
+    assert cfg.api_base_url == "http://host.docker.internal:11434"
+
+
+def test_settings_save_preserves_engine_choice(tmp_path: Path) -> None:
+    from job_agent.config import load_config
+
+    cfg_path = tmp_path / "config.json"
+    client = TestClient(create_app(config_path=cfg_path))
+    _seed_config(client)
+    client.post("/engine/save", data={"engine": "ollama", "ollama_model": "qwen2"})
+    # повторное сохранение Настройки не должно сбросить движок обратно на cli
+    client.post("/save", data=_single_track_form())
+    cfg = load_config(cfg_path)
+    assert cfg.scoring_engine == "ollama" and cfg.ollama_model == "qwen2"
+
+
+def test_engine_status_route_lists_engines(tmp_path: Path) -> None:
+    client = TestClient(create_app(config_path=tmp_path / "config.json"))
+    data = client.get("/engine/status").json()
+    keys = {e["key"] for e in data["engines"]}
+    assert keys == {"claude", "codex", "ollama", "api_key"}
+    for e in data["engines"]:
+        assert set(e) >= {"key", "label", "billing", "installed", "authorized", "detail"}
 
 
 def test_save_invalid_config_rejected_keeps_no_file(tmp_path: Path) -> None:

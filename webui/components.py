@@ -26,7 +26,37 @@ __all__ = [
     "card",
     "icon",
     "verdict_line",
+    "nav",
+    "status_pill",
 ]
+
+#: Пункты верхнего меню web-UI: (маршрут, иконка, подпись).
+NAV_ITEMS: tuple[tuple[str, str, str], ...] = (
+    ("/", "ti-adjustments", "Настройка"),
+    ("/engine", "ti-cpu", "AI · авторизация"),
+    ("/results", "ti-list-check", "Подборка"),
+)
+
+
+def nav(active: str = "") -> str:
+    """Верхнее меню-навигация (одинаковое на всех экранах).
+
+    `active` — текущий маршрут, его пункт подсвечивается. Это единственная
+    навигация между экранами; рендерится из `page()` поверх каждого экрана.
+    """
+    items = "".join(
+        f'<a class="nav__item{" nav__item--active" if path == active else ""}" '
+        f'href="{path}">{icon(ic)} {escape(label)}</a>'
+        for path, ic, label in NAV_ITEMS
+    )
+    return f'<nav class="nav">{items}</nav>'
+
+
+def status_pill(*, ok: bool, text: str, unknown: bool = False) -> str:
+    """Пилюля статуса (ок/нет/неизвестно) для карточек авторизации."""
+    state = "unknown" if unknown else ("ok" if ok else "bad")
+    glyph = {"ok": "ti-circle-check", "bad": "ti-circle-x", "unknown": "ti-circle-dashed"}[state]
+    return f'<span class="pill pill--{state}">{icon(glyph)} {escape(text)}</span>'
 
 
 def icon(name: str) -> str:

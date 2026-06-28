@@ -112,6 +112,97 @@
   font-size: 13px;
 }
 
+/* ── верхнее меню-навигация ───────────────────────────────────── */
+.nav {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 8px 0;
+}
+
+.nav__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.nav__item--active {
+  background: var(--bg-accent);
+  color: var(--text-accent);
+}
+
+/* ── пилюля статуса (авторизация движков) ─────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pill--ok {
+  background: var(--bg-accent);
+  color: var(--text-accent);
+}
+
+.pill--bad {
+  background: var(--bg-warning);
+  color: var(--text-warning);
+}
+
+.pill--unknown {
+  background: var(--surface-1);
+  color: var(--text-muted);
+}
+
+/* ── панель авторизации движка ────────────────────────────────── */
+.auth-panel {
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: 12px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.auth-panel__title {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.auth-panel__hint {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.auth-panel__hint code {
+  background: var(--surface-1);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.hint-set {
+  color: var(--text-accent);
+  font-size: 11px;
+}
+
 /* ── форма «Настройка» (Task 5.1) ─────────────────────────────── */
 .field {
   display: flex;

@@ -1,10 +1,11 @@
 """FastAPI-приложение web-UI.
 
-Экран 1 «Настройка» (Task 5.1) — единственный прокручиваемый столбец max-width
-720px поверх дизайн-каркаса (Task 5.0): шапка, warning про always-on, карта
-«Профиль» с повторяемой карточкой направления (заменяет две фиксированные
-колонки прототипа), общий блок «Карта поиска», «Источники», «Движок AI»,
-«Выхлоп». Сабмит пишет `config.json`, валидный по `config.schema.json`.
+Три экрана под общим меню-навигацией (`components.nav`): «Настройка» (`/`,
+профиль/источники/выхлоп), «AI · авторизация» (`/engine`, выбор движка + статус
+установки/авторизации Claude/Codex/Ollama + web-поиск) и «Подборка» (`/results`).
+Обе формы (Настройка и AI) мержат свой поднабор полей в общий `config.json`
+(валидный по `config.schema.json`); секреты авторизации движков пишутся в
+`/data/.env` (`env_store`), а не в конфиг — их читают CLI-агенты из окружения.
 
 Никаких внешних обращений: webfont Tabler вшит в `static/fonts/`, стили и
 скрипты — локальные, CDN не используется.
@@ -12,6 +13,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 import re
 from pathlib import Path
 
@@ -20,9 +23,11 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from job_agent.config import ConfigError, load_config
-from webui.components import chip, icon
-from webui.forms import config_from_form
-from webui.render import render_results, render_settings, save_result_page
+from webui.components import chip, icon, nav
+from webui.engine_status import engine_statuses
+from webui.env_store import merge_env, parse_env
+from webui.forms import config_from_form, engine_config_from_form
+from webui.render import render_engine, render_results, render_settings, save_result_page
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -63,11 +68,15 @@ _HEAD = """\
 _DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.json"
 
 
-def page(body: str, *, scripts: str = "") -> str:
-    """Обёртка страницы: единственный столбец max-width 720px."""
+def page(body: str, *, scripts: str = "", active: str = "") -> str:
+    """Обёртка страницы: верхнее меню + единственный столбец max-width 720px.
+
+    `active` — текущий маршрут для подсветки пункта меню.
+    """
     return (
         "<!doctype html><html lang=ru><head>"
-        f"{_HEAD}</head><body><main class=col>{body}</main>{scripts}</body></html>"
+        f"{_HEAD}</head><body>{nav(active)}"
+        f"<main class=col>{body}</main>{scripts}</body></html>"
     )
 
 
@@ -81,15 +90,77 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     target = Path(config_path) if config_path is not None else _DEFAULT_CONFIG_PATH
 
+    envfile = target.parent / ".env"
+
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
-        return page(render_settings(), scripts='<script src="/static/js/settings.js"></script>')
+        return page(
+            render_settings(),
+            scripts='<script src="/static/js/settings.js"></script>',
+            active="/",
+        )
 
     @app.get("/results", response_class=HTMLResponse)
     def results() -> str:
         # Прогоны нигде не персистятся — пока нет данных, показываем пустое
         # состояние. Карточки собирает чистая `render_results` (юнит-тесты).
-        return page(render_results([]))
+        return page(render_results([]), active="/results")
+
+    @app.get("/engine", response_class=HTMLResponse)
+    def engine() -> str:
+        cfg = _load_raw(target)
+        env = {**os.environ, **parse_env(envfile)}
+        se = cfg.get("scoring_engine", "cli")
+        return page(
+            render_engine(
+                scoring_engine=se,
+                cli_tool=cfg.get("cli_tool", "claude"),
+                ollama_url=cfg.get("api_base_url", "") if se == "ollama" else "",
+                ollama_model=cfg.get("ollama_model", ""),
+                api_base_url=cfg.get("api_base_url", "") if se == "api_key" else "",
+                web_search_url=(cfg.get("web_search") or {}).get("url", ""),
+                has_claude_token=bool(
+                    env.get("CLAUDE_CODE_OAUTH_TOKEN") or env.get("ANTHROPIC_API_KEY")
+                ),
+                has_codex_key=bool(env.get("OPENAI_API_KEY")),
+                has_api_key=bool(cfg.get("api_key")),
+            ),
+            scripts='<script src="/static/js/engine.js"></script>',
+            active="/engine",
+        )
+
+    @app.get("/engine/status")
+    def engine_status() -> JSONResponse:
+        cfg = _load_raw(target)
+        env = {**os.environ, **parse_env(envfile)}
+        ollama_url = cfg.get("api_base_url", "") if cfg.get("scoring_engine") == "ollama" else ""
+        statuses = engine_statuses(
+            env=env, ollama_url=ollama_url, has_api_key=bool(cfg.get("api_key"))
+        )
+        return JSONResponse({"engines": [s.as_dict() for s in statuses]})
+
+    @app.post("/engine/test")
+    async def engine_test(request: Request) -> JSONResponse:
+        form = await request.form()
+        ok, message = _probe_engine(str(form.get("engine", "")), _load_raw(target), envfile)
+        return JSONResponse({"ok": ok, "message": message}, status_code=200 if ok else 400)
+
+    @app.post("/engine/save", response_class=HTMLResponse)
+    async def engine_save(request: Request) -> HTMLResponse:
+        form = await request.form()
+        updates, secrets = engine_config_from_form(form)
+        try:
+            _merge_and_validate(updates, target)
+        except ConfigError as exc:
+            return HTMLResponse(
+                page(save_result_page(ok=False, message=str(exc)), active="/engine"),
+                status_code=400,
+            )
+        if secrets:  # токены/ключи — в .env, не в config.json
+            merge_env(envfile, secrets)
+        return HTMLResponse(
+            page(save_result_page(ok=True, path=str(target)), active="/engine")
+        )
 
     @app.post("/upload")
     async def upload(file: UploadFile = File(...), kind: str = Form(...)) -> JSONResponse:
@@ -116,26 +187,48 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
         form = await request.form()
         data = config_from_form(form)
         try:
-            written = _write_and_validate(data, target)
+            # Мерж: Настройка не несёт полей движка — берём их из текущего
+            # конфига; при первом сохранении проставляем дефолтный движок.
+            written = _merge_and_validate(
+                data, target, defaults={"scoring_engine": "cli", "cli_tool": "claude"}
+            )
         except ConfigError as exc:
-            return HTMLResponse(page(save_result_page(ok=False, message=str(exc))), status_code=400)
+            return HTMLResponse(
+                page(save_result_page(ok=False, message=str(exc)), active="/"),
+                status_code=400,
+            )
         action = str(form.get("action", "save"))
-        return HTMLResponse(page(save_result_page(ok=True, action=action, path=str(written))))
+        return HTMLResponse(
+            page(save_result_page(ok=True, action=action, path=str(written)), active="/")
+        )
 
     return app
 
 
-def _write_and_validate(data: dict, target: Path) -> Path:
-    """Записать конфиг и проверить, что он грузится валидным по схеме.
+def _load_raw(target: Path) -> dict:
+    """Текущий config.json как dict (или `{}`, если нет/битый) — для мержа/префилла."""
+    if target.exists():
+        try:
+            return json.loads(target.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+    return {}
 
-    Пишем во временный файл рядом с целью, валидируем, затем атомарно подменяем —
-    битый сабмит не затирает рабочий `config.json`.
+
+def _merge_and_validate(updates: dict, target: Path, *, defaults: dict | None = None) -> Path:
+    """Слить `updates` в текущий конфиг, проверить по схеме, атомарно записать.
+
+    Две страницы (Настройка и AI) пишут один `config.json`, каждая — свой поднабор
+    полей. `defaults` заполняют недостающие обязательные поля при первом сохранении.
+    Битый сабмит не затирает рабочий конфиг (валидация на temp до подмены).
     """
-    import json
+    merged = {**_load_raw(target), **updates}
+    for key, value in (defaults or {}).items():
+        merged.setdefault(key, value)
 
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_suffix(target.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
     try:
         load_config(tmp)  # бросит ConfigError, если невалидно
     except ConfigError:
@@ -143,6 +236,48 @@ def _write_and_validate(data: dict, target: Path) -> Path:
         raise
     tmp.replace(target)
     return target
+
+
+def _probe_engine(engine_key: str, cfg: dict, envfile: Path) -> tuple[bool, str]:
+    """Реальная мини-проба движка для кнопки «Проверить» (явное действие).
+
+    Движок строится напрямую (без полного Config — треки не нужны). Для CLI в
+    subprocess инжектится окружение из `.env`, чтобы только что вставленный токен
+    проверялся сразу (пайплайн подхватит его после рестарта стека).
+    """
+    import subprocess
+
+    prompt = "Ответь одним словом: ok"
+    try:
+        if engine_key in ("claude", "codex"):
+            from job_agent.engines.cli import CliEngine
+
+            env = {**os.environ, **parse_env(envfile)}
+
+            def runner(argv: list[str]) -> str:
+                return subprocess.run(
+                    argv, capture_output=True, text=True, timeout=60, env=env, check=True
+                ).stdout
+
+            out = CliEngine(engine_key, runner=runner).complete(prompt)
+        elif engine_key == "ollama":
+            from job_agent.engines.ollama import OllamaEngine
+
+            out = OllamaEngine(
+                cfg.get("ollama_model") or "", base_url=cfg.get("api_base_url")
+            ).complete(prompt)
+        elif engine_key == "api_key":
+            from job_agent.engines.api_key import ApiKeyEngine
+
+            out = ApiKeyEngine(
+                cfg.get("api_key") or "", base_url=cfg.get("api_base_url")
+            ).complete(prompt)
+        else:
+            return False, f"неизвестный движок: {engine_key}"
+        text = (out or "").strip()
+        return True, text[:120] or "пустой ответ"
+    except Exception as exc:  # сеть/процесс/конфиг — показываем причину
+        return False, str(exc)[:200]
 
 
 # Экспортируемые для каркаса/тестов примитивы (совместимость с Task 5.0).
