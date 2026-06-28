@@ -88,6 +88,9 @@ class Config(BaseModel):
 
     multi_track_scoring: bool = False
     multi_track_delta: float = 0.05
+    # Порог близости пре-фильтра; калибруется командой `calibrate` (Task 4.4).
+    # Дефолт совпадает с prefilter.DEFAULT_MIN_SIM (без импорта — избегаем цикла).
+    min_sim: float = 0.30
 
     tg_channels: list[TgChannel] = Field(default_factory=list)
     use_aggregators: bool = True

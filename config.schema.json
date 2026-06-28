@@ -65,6 +65,13 @@
       "maximum": 1,
       "description": "Порог близости косинусов, при котором второй трек тоже идёт в скоринг (только если multi_track_scoring=true)."
     },
+    "min_sim": {
+      "type": "number",
+      "default": 0.30,
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Порог близости пре-фильтра (косинус резюме↔вакансия): ниже — вакансия отсекается до скоринга. Калибруется на backfill командой `job-agent calibrate`; 0.30 — мягкий стартовый дефолт."
+    },
 
     "tg_channels": {
       "type": "array",

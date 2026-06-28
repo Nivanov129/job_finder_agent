@@ -3,9 +3,10 @@
 Команда `backfill` прогоняет исторический проход (стадии 1–5 + xlsx) за N дней
 и пишет `.xlsx`. Команда `nightly` — инкрементальный прогон (только новое с
 прошлого раза); в проде её дёргает cron в контейнере раз в сутки, опц. `--serve`
-запускает встроенный цикл вне Docker. Логи стадий идут через `logging` в stdout:
-«собрано N · после фильтра M · топ-K». Боевые внешние границы строятся по конфигу
-внутри пайплайна.
+запускает встроенный цикл вне Docker. Команда `calibrate` подбирает порог
+пре-фильтра `min_sim` по распределению близостей на backfill (без скоринга).
+Логи стадий идут через `logging` в stdout: «собрано N · после фильтра M · топ-K».
+Боевые внешние границы строятся по конфигу внутри пайплайна.
 """
 
 from __future__ import annotations
@@ -16,9 +17,10 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from .calibrate import calibrate, format_report
 from .config import load_config
 from .pipeline import run_backfill, run_nightly
-from .prefilter import DEFAULT_LIMIT, DEFAULT_MIN_SIM
+from .prefilter import DEFAULT_LIMIT
 from .scheduler import ALWAYS_ON_WARNING, parse_at, serve
 
 __all__ = ["main", "build_parser"]
@@ -48,8 +50,8 @@ def build_parser() -> argparse.ArgumentParser:
     backfill.add_argument(
         "--min-sim",
         type=float,
-        default=DEFAULT_MIN_SIM,
-        help=f"Порог близости пре-фильтра (дефолт {DEFAULT_MIN_SIM}, калибруется)",
+        default=None,
+        help="Порог близости пре-фильтра (дефолт — min_sim из конфига; калибруется)",
     )
     backfill.add_argument(
         "--limit",
@@ -71,8 +73,8 @@ def build_parser() -> argparse.ArgumentParser:
     nightly.add_argument(
         "--min-sim",
         type=float,
-        default=DEFAULT_MIN_SIM,
-        help=f"Порог близости пре-фильтра (дефолт {DEFAULT_MIN_SIM}, калибруется)",
+        default=None,
+        help="Порог близости пре-фильтра (дефолт — min_sim из конфига; калибруется)",
     )
     nightly.add_argument(
         "--limit",
@@ -90,6 +92,24 @@ def build_parser() -> argparse.ArgumentParser:
         default="03:00",
         help="Час ежедневного прогона HH:MM для --serve (дефолт 03:00)",
     )
+
+    calibrate_cmd = sub.add_parser(
+        "calibrate",
+        help="Подобрать порог пре-фильтра min_sim на backfill (без скоринга)",
+    )
+    calibrate_cmd.add_argument("--config", required=True, help="Путь к config.json")
+    calibrate_cmd.add_argument(
+        "--days",
+        type=int,
+        default=None,
+        help="Глубина в днях (дефолт — backfill_days из конфига)",
+    )
+    calibrate_cmd.add_argument(
+        "--bins",
+        type=int,
+        default=10,
+        help="Число корзин гистограммы распределения (дефолт 10)",
+    )
     return parser
 
 
@@ -102,15 +122,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "backfill":
         config = load_config(args.config)
         base_dir = Path(args.config).resolve().parent
+        min_sim = args.min_sim if args.min_sim is not None else config.min_sim
         result = run_backfill(
             config,
             days=args.days,
             output_path=args.out,
             base_dir=base_dir,
-            min_sim=args.min_sim,
+            min_sim=min_sim,
             limit=args.limit,
         )
         logging.getLogger("job_agent.cli").info("Готово: %s", result.output_path)
+        return 0
+
+    if args.command == "calibrate":
+        config = load_config(args.config)
+        base_dir = Path(args.config).resolve().parent
+        report = calibrate(config, days=args.days, bins=args.bins, base_dir=base_dir)
+        logging.getLogger("job_agent.cli").info("%s", format_report(report))
         return 0
 
     if args.command == "nightly":
@@ -118,13 +146,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         log.warning("%s", ALWAYS_ON_WARNING)
         config = load_config(args.config)
         base_dir = Path(args.config).resolve().parent
+        min_sim = args.min_sim if args.min_sim is not None else config.min_sim
 
         def _run() -> None:
             result = run_nightly(
                 config,
                 output_path=args.out,
                 base_dir=base_dir,
-                min_sim=args.min_sim,
+                min_sim=min_sim,
                 limit=args.limit,
             )
             log.info("Готово: %s", result.output_path)

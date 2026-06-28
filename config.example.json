@@ -45,6 +45,8 @@
   "multi_track_scoring": false,
   "multi_track_delta": 0.05,
 
+  "min_sim": 0.30,
+
   "tg_channels": [
     { "handle": "forhirejobs", "private": false },
     { "handle": "product_jobs", "private": false }
