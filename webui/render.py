@@ -38,16 +38,6 @@ __all__ = [
 DEFAULT_TOP_K = 15
 
 
-def _header() -> str:
-    return (
-        '<div class="app-header">'
-        f'<span class="app-header__icon">{icon("ti-radar-2")}</span>'
-        '<div><div class="card__title">Job agent · настройка</div>'
-        '<div class="card__meta">локально на вашем компьютере</div></div>'
-        "</div>"
-    )
-
-
 def _warning() -> str:
     return (
         '<div class="notice-warning">'
@@ -288,8 +278,7 @@ def render_settings(cfg: dict | None = None) -> str:
     ]
     mode = cfg.get("output_mode", "both")
     return (
-        _header()
-        + _warning()
+        _warning()
         + '<form method="post" action="/save">'
         + _profile_card(tracks, search_map_path)
         + _sources_card(cfg.get("use_aggregators", True), private_handles)
@@ -444,8 +433,7 @@ def render_engine(
     )
 
     return (
-        _engine_header()
-        + '<form method="post" action="/engine/save">'
+        '<form method="post" action="/engine/save">'
         '<section class="card">'
         f'<div class="card__title">{icon("ti-cpu")} Движок AI</div>'
         f'<div class="engine-grid">{choices}</div>'
@@ -454,16 +442,6 @@ def render_engine(
         + '<div class="form-footer">'
         '<button type="submit" class="btn btn--accent">Сохранить</button></div>'
         "</form>"
-    )
-
-
-def _engine_header() -> str:
-    return (
-        '<div class="app-header">'
-        f'<span class="app-header__icon">{icon("ti-cpu")}</span>'
-        '<div><div class="card__title">AI · авторизация</div>'
-        '<div class="card__meta">движок скоринга и доступ к нему — локально</div></div>'
-        "</div>"
     )
 
 
@@ -522,15 +500,7 @@ def render_telegram(*, has_session: bool = False, saved: list[str] | None = None
         'class="btn btn--accent tg-save" hidden>Сохранить выбранные</button></div>'
         "</section>"
     )
-    return (
-        '<div class="app-header">'
-        f'<span class="app-header__icon">{icon("ti-brand-telegram")}</span>'
-        '<div><div class="card__title">Telegram</div>'
-        '<div class="card__meta">вход в твой аккаунт и подбор каналов с вакансиями'
-        "</div></div></div>"
-        + login
-        + channels
-    )
+    return login + channels
 
 
 def render_results_screen() -> str:
