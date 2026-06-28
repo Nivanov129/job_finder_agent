@@ -1,8 +1,11 @@
 """CLI агента подбора вакансий.
 
 Команда `backfill` прогоняет исторический проход (стадии 1–5 + xlsx) за N дней
-и пишет `.xlsx`. Логи стадий идут через `logging` в stdout: «собрано N · после
-фильтра M · топ-K». Боевые внешние границы строятся по конфигу внутри пайплайна.
+и пишет `.xlsx`. Команда `nightly` — инкрементальный прогон (только новое с
+прошлого раза); в проде её дёргает cron в контейнере раз в сутки, опц. `--serve`
+запускает встроенный цикл вне Docker. Логи стадий идут через `logging` в stdout:
+«собрано N · после фильтра M · топ-K». Боевые внешние границы строятся по конфигу
+внутри пайплайна.
 """
 
 from __future__ import annotations
@@ -14,8 +17,9 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .config import load_config
-from .pipeline import run_backfill
+from .pipeline import run_backfill, run_nightly
 from .prefilter import DEFAULT_LIMIT, DEFAULT_MIN_SIM
+from .scheduler import ALWAYS_ON_WARNING, parse_at, serve
 
 __all__ = ["main", "build_parser"]
 
@@ -53,6 +57,39 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_LIMIT,
         help=f"Сколько финалистов скорить (дефолт {DEFAULT_LIMIT})",
     )
+
+    nightly = sub.add_parser(
+        "nightly",
+        help="Инкрементальный прогон (только новое с прошлого раза) → .xlsx",
+    )
+    nightly.add_argument("--config", required=True, help="Путь к config.json")
+    nightly.add_argument(
+        "--out",
+        default="job-agent-result.xlsx",
+        help="Путь к выходному .xlsx",
+    )
+    nightly.add_argument(
+        "--min-sim",
+        type=float,
+        default=DEFAULT_MIN_SIM,
+        help=f"Порог близости пре-фильтра (дефолт {DEFAULT_MIN_SIM}, калибруется)",
+    )
+    nightly.add_argument(
+        "--limit",
+        type=int,
+        default=DEFAULT_LIMIT,
+        help=f"Сколько финалистов скорить (дефолт {DEFAULT_LIMIT})",
+    )
+    nightly.add_argument(
+        "--serve",
+        action="store_true",
+        help="Встроенный цикл вне Docker (по умолчанию один прогон — расписание держит cron)",
+    )
+    nightly.add_argument(
+        "--at",
+        default="03:00",
+        help="Час ежедневного прогона HH:MM для --serve (дефолт 03:00)",
+    )
     return parser
 
 
@@ -74,6 +111,30 @@ def main(argv: Sequence[str] | None = None) -> int:
             limit=args.limit,
         )
         logging.getLogger("job_agent.cli").info("Готово: %s", result.output_path)
+        return 0
+
+    if args.command == "nightly":
+        log = logging.getLogger("job_agent.cli")
+        log.warning("%s", ALWAYS_ON_WARNING)
+        config = load_config(args.config)
+        base_dir = Path(args.config).resolve().parent
+
+        def _run() -> None:
+            result = run_nightly(
+                config,
+                output_path=args.out,
+                base_dir=base_dir,
+                min_sim=args.min_sim,
+                limit=args.limit,
+            )
+            log.info("Готово: %s", result.output_path)
+
+        if args.serve:
+            at = parse_at(args.at)
+            log.info("Встроенный цикл: ежедневно в %s", args.at)
+            serve(_run, at=at)
+        else:
+            _run()
         return 0
 
     parser.error(f"неизвестная команда: {args.command}")  # pragma: no cover
