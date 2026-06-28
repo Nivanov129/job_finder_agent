@@ -1,0 +1,41 @@
+{
+  "vacancies": [
+    {
+      "id": 301,
+      "slug": "301-senior-product-manager",
+      "title": "Senior Product Manager",
+      "company": { "name": "MatchScale" },
+      "salary_from": 350000,
+      "salary_to": 500000,
+      "salary_currency": "₽",
+      "published_at": "2024-06-26T10:00:00Z",
+      "short_description": "Продукт с реальными метриками и владением ими."
+    },
+    {
+      "id": 302,
+      "slug": "302-ai-product-lead",
+      "title": "AI Product Lead",
+      "company": { "name": "DeepStack" },
+      "salary": "300000–600000 ₽",
+      "published_at": "2024-06-18T09:15:00Z",
+      "description": "AI как ядро продукта, Series A–C."
+    },
+    {
+      "id": 303,
+      "slug": "303-archived",
+      "title": "Head of Product",
+      "company": "LegacyOrg",
+      "salary_from": 250000,
+      "salary_currency": "₽",
+      "published_at": "2024-04-10T08:00:00Z",
+      "description": "Старая вакансия для проверки фильтра по дате."
+    },
+    {
+      "id": 304,
+      "company": { "name": "NoTitleCo" },
+      "salary": "по договорённости",
+      "published_at": "2024-06-27T08:00:00Z",
+      "description": "Запись без заголовка — должна быть пропущена."
+    }
+  ]
+}

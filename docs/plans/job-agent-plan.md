@@ -130,9 +130,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 1.2: Коллекторы агрегаторов
-- [ ] `collectors/vseti.py`, `collectors/getmatch.py` по тому же интерфейсу. Хрупкость вёрстки изолирована в адаптере.
-- [ ] Тесты на HTML/JSON-фикстурах.
-- [ ] Mark completed
+- [x] `collectors/vseti.py`, `collectors/getmatch.py` по тому же интерфейсу. Хрупкость вёрстки изолирована в адаптере.
+- [x] Тесты на HTML/JSON-фикстурах.
+- [x] Mark completed
 
 ### Task 1.3: TG приватный (Telethon, опц.)
 - [ ] `collectors/telegram_private.py`: за интерфейсом, активен только при `telethon_creds`, сетевой код за фасадом.
