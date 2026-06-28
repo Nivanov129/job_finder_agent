@@ -118,9 +118,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 0.4: Общие константы представления
-- [ ] `presentation.py` по `design/design-tokens.md`: `badge_band(overall)->'green'|'amber'|'grey'` (дефолт ≥80 / 70–79 / <70, конфигурируемо), hex-цвета бейджей (для xlsx-заливки и web/бота), маппинг `verdict.type → (иконка, тон)`. Единственный источник для xlsx (Task 1.12), бота (Task 2.3), web-UI (Фаза 5).
-- [ ] Тесты на границы диапазонов и маппинг вердиктов.
-- [ ] Mark completed
+- [x] `presentation.py` по `design/design-tokens.md`: `badge_band(overall)->'green'|'amber'|'grey'` (дефолт ≥80 / 70–79 / <70, конфигурируемо), hex-цвета бейджей (для xlsx-заливки и web/бота), маппинг `verdict.type → (иконка, тон)`. Единственный источник для xlsx (Task 1.12), бота (Task 2.3), web-UI (Фаза 5).
+- [x] Тесты на границы диапазонов и маппинг вердиктов.
+- [x] Mark completed
 
 ## Фаза 1 — Backfill core (милстоун 1: доказать пайплайн, получить .xlsx за 14 дней)
 
