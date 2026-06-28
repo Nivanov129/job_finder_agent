@@ -28,6 +28,7 @@ __all__ = [
     "save_result_page",
     "vacancy_card",
     "render_results",
+    "render_run",
 ]
 
 #: Дефолтное число карточек подборки за прогон (топ по overall).
@@ -388,6 +389,20 @@ def _engine_header() -> str:
         '<div><div class="card__title">AI · авторизация</div>'
         '<div class="card__meta">движок скоринга и доступ к нему — локально</div></div>'
         "</div>"
+    )
+
+
+def render_run() -> str:
+    """Страница «Прогон»: статус backfill (наполняет run.js опросом /run/status)."""
+    return (
+        '<div class="app-header">'
+        f'<span class="app-header__icon">{icon("ti-player-play")}</span>'
+        '<div><div class="card__title">Прогон backfill</div>'
+        '<div class="card__meta">сбор → фильтр → скоринг → .xlsx</div></div>'
+        "</div>"
+        '<section class="card"><div class="run-status" data-run-status>'
+        f'{icon("ti-loader")} запускаю…</div></section>'
+        '<p><a href="/">← к настройке</a> · <a href="/results">подборка</a></p>'
     )
 
 

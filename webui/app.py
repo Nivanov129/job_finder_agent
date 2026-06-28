@@ -18,8 +18,8 @@ import os
 import re
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, File, Form, Request, Response, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
@@ -29,7 +29,14 @@ from webui.engine_status import engine_statuses, ollama_models, recommend_first
 from webui.env_store import merge_env, parse_env
 from webui.forms import config_from_form, engine_config_from_form
 from webui.login_flow import LoginManager, LoginSpawner, default_spawner
-from webui.render import render_engine, render_results, render_settings, save_result_page
+from webui.render import (
+    render_engine,
+    render_results,
+    render_run,
+    render_settings,
+    save_result_page,
+)
+from webui.runner import BackfillRunner
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -86,6 +93,7 @@ def create_app(
     config_path: Path | str | None = None,
     *,
     login_spawner: LoginSpawner | None = None,
+    backfill_runner: BackfillRunner | None = None,
 ) -> FastAPI:
     """Собрать FastAPI-приложение web-UI.
 
@@ -101,6 +109,7 @@ def create_app(
     logins = LoginManager(
         envfile, spawn=login_spawner or default_spawner(envfile)
     )
+    runner = backfill_runner or BackfillRunner()
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
@@ -253,8 +262,41 @@ def create_app(
                 status_code=400,
             )
         action = str(form.get("action", "save"))
+        if action == "backfill":
+            # Конфиг сохранён — запускаем фоновый прогон и ведём на страницу «Прогон».
+            runner.start(target)
+            return HTMLResponse(
+                page(
+                    render_run(),
+                    scripts='<script src="/static/js/run.js"></script>',
+                    active="/results",
+                )
+            )
         return HTMLResponse(
             page(save_result_page(ok=True, action=action, path=str(written)), active="/")
+        )
+
+    @app.get("/run", response_class=HTMLResponse)
+    def run_page() -> str:
+        return page(
+            render_run(),
+            scripts='<script src="/static/js/run.js"></script>',
+            active="/results",
+        )
+
+    @app.get("/run/status")
+    def run_status() -> JSONResponse:
+        return JSONResponse(runner.state())
+
+    @app.get("/run/output.xlsx")
+    def run_output() -> Response:
+        out = target.parent / "backfill.xlsx"
+        if not out.exists():
+            return JSONResponse({"error": "файл прогона не найден"}, status_code=404)
+        return FileResponse(
+            out,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename="backfill.xlsx",
         )
 
     return app

@@ -478,6 +478,37 @@ def test_engine_page_ollama_simplified(client: TestClient) -> None:
     assert 'name="ollama_url"' not in body
 
 
+def test_save_backfill_starts_run_and_shows_run_page(tmp_path: Path) -> None:
+    from webui.runner import BackfillRunner
+
+    started: list[str] = []
+    runner = BackfillRunner(run=lambda p: started.append(str(p)) or {"written": 0})
+    client = TestClient(
+        create_app(config_path=tmp_path / "config.json", backfill_runner=runner)
+    )
+    form = dict(_single_track_form())
+    form["action"] = "backfill"
+    r = client.post("/save", data=form)
+    assert r.status_code == 200
+    assert "Прогон backfill" in r.text and "/static/js/run.js" in r.text
+    # прогон реально запущен (фейк-раннер позвали)
+    for _ in range(100):
+        if started:
+            break
+        import time
+
+        time.sleep(0.01)
+    assert started  # backfill стартовал
+
+
+def test_run_status_and_output_routes(tmp_path: Path) -> None:
+    client = TestClient(create_app(config_path=tmp_path / "config.json"))
+    # статус по умолчанию — idle
+    assert client.get("/run/status").json()["status"] == "idle"
+    # выгрузки ещё нет → 404
+    assert client.get("/run/output.xlsx").status_code == 404
+
+
 def test_engine_save_triggers_autoverify(tmp_path: Path) -> None:
     client = TestClient(create_app(config_path=tmp_path / "config.json"))
     _seed_config(client)
