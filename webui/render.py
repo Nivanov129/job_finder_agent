@@ -22,6 +22,7 @@ from webui.components import badge, icon, track_tag, verdict_line
 
 __all__ = [
     "render_settings",
+    "path_field",
     "track_card",
     "save_result_page",
     "vacancy_card",
@@ -51,6 +52,33 @@ def _warning() -> str:
     )
 
 
+def path_field(
+    *, name: str, label_html: str, placeholder: str, kind: str, accept: str = ""
+) -> str:
+    """Поле-путь к файлу с кнопкой «Загрузить» рядом.
+
+    Текстовый `input` (путь) + кнопка, которая через JS (`settings.js`) шлёт
+    выбранный файл на `/upload` и подставляет вернувшийся относительный путь.
+    `kind` — тип файла (resume/template/search_map), решает подпапку на сервере.
+    Скрытый `file`-input лежит соседом кнопки в `.path-input`, чтобы работать и в
+    клонированных карточках направления (поиск идёт по соседям, не по `name`).
+    """
+    acc = f' accept="{accept}"' if accept else ""
+    return (
+        '<div class="field"><span class="field__label">'
+        + label_html
+        + "</span>"
+        '<div class="path-input">'
+        f'<input class="input" name="{name}" placeholder="{placeholder}">'
+        f'<button type="button" class="btn btn--ghost file-upload" data-kind="{kind}">'
+        f'{icon("ti-upload")} Загрузить</button>'
+        f'<input type="file" class="file-upload__input" hidden{acc}>'
+        "</div>"
+        '<span class="path-input__status" aria-live="polite"></span>'
+        "</div>"
+    )
+
+
 def track_card(*, removable: bool = True) -> str:
     """Одна повторяемая карточка направления (имя · резюме · шаблон · рубрика · роли).
 
@@ -71,13 +99,21 @@ def track_card(*, removable: bool = True) -> str:
         "</div>"
         '<label class="field"><span class="field__label">Имя направления</span>'
         '<input class="input" name="track_name" placeholder="напр. Backend"></label>'
-        f'<label class="field"><span class="field__label">{icon("ti-file-cv")} '
-        'Резюме (путь к файлу)</span>'
-        '<input class="input" name="track_resume" placeholder="./resumes/backend.pdf"></label>'
-        f'<label class="field"><span class="field__label">{icon("ti-mail")} '
-        'Шаблон сопроводительного · пример (опц.)</span>'
-        '<input class="input" name="track_template" '
-        'placeholder="./cover-templates/default.md"></label>'
+        + path_field(
+            name="track_resume",
+            label_html=f'{icon("ti-file-cv")} Резюме (путь к файлу)',
+            placeholder="./resumes/backend.pdf",
+            kind="resume",
+            accept=".pdf,.doc,.docx,.txt,.md,.rtf",
+        )
+        + path_field(
+            name="track_template",
+            label_html=f'{icon("ti-mail")} Шаблон сопроводительного · пример (опц.)',
+            placeholder="./cover-templates/default.md",
+            kind="template",
+            accept=".md,.txt",
+        )
+        +
         '<label class="field"><span class="field__label">Рубрика — «что для меня '
         'попадание» (опц.)</span>'
         '<textarea class="input" name="track_rubric" rows="2"></textarea></label>'
@@ -96,9 +132,14 @@ def _profile_card() -> str:
     )
     search_map = (
         '<div class="panel panel--dashed">'
-        f'<div class="field__label">{icon("ti-map-2")} Карта поиска · общая</div>'
-        '<input class="input" name="search_map_path" '
-        'placeholder="./search-map.md — примеры идеальных вакансий"></div>'
+        + path_field(
+            name="search_map_path",
+            label_html=f'{icon("ti-map-2")} Карта поиска · общая',
+            placeholder="./search-map.md — примеры идеальных вакансий",
+            kind="search_map",
+            accept=".md,.txt,.json",
+        )
+        + "</div>"
     )
     return (
         '<section class="card">'

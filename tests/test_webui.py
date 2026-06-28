@@ -163,6 +163,92 @@ def test_settings_screen_inventory(client: TestClient) -> None:
     assert "/static/js/settings.js" in body
 
 
+def test_settings_has_upload_controls(client: TestClient) -> None:
+    body = client.get("/").text
+    # рядом с каждым полем-путём — кнопка загрузки со скрытым file-input
+    for kind in ("resume", "template", "search_map"):
+        assert f'data-kind="{kind}"' in body
+    assert "ti-upload" in body and "Загрузить" in body
+    assert 'type="file"' in body and "file-upload__input" in body
+    # загрузка ходит на /upload (через локальный settings.js, без CDN)
+    assert "/static/js/settings.js" in body
+
+
+def test_upload_saves_file_and_returns_relative_path(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.json"
+    client = TestClient(create_app(config_path=cfg_path))
+    r = client.post(
+        "/upload",
+        data={"kind": "resume"},
+        files={"file": ("backend.pdf", b"%PDF-1.4 data", "application/pdf")},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["path"] == "uploads/resumes/backend.pdf"
+    assert body["name"] == "backend.pdf"
+    saved = tmp_path / "uploads" / "resumes" / "backend.pdf"
+    assert saved.exists() and saved.read_bytes() == b"%PDF-1.4 data"
+
+
+def test_upload_rejects_unknown_kind(tmp_path: Path) -> None:
+    client = TestClient(create_app(config_path=tmp_path / "config.json"))
+    r = client.post(
+        "/upload",
+        data={"kind": "evil"},
+        files={"file": ("x.txt", b"x", "text/plain")},
+    )
+    assert r.status_code == 400
+    assert not (tmp_path / "uploads").exists()  # ничего не записали
+
+
+def test_upload_sanitizes_path_traversal_filename(tmp_path: Path) -> None:
+    client = TestClient(create_app(config_path=tmp_path / "config.json"))
+    r = client.post(
+        "/upload",
+        data={"kind": "template"},
+        files={"file": ("../../etc/passwd", b"pwn", "text/plain")},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert ".." not in body["path"]
+    assert body["path"] == "uploads/cover-templates/passwd"
+    # файл лёг строго внутрь каталога данных, обхода нет
+    assert (tmp_path / "uploads" / "cover-templates" / "passwd").exists()
+    assert not (tmp_path.parent / "etc" / "passwd").exists()
+
+
+def test_upload_preserves_cyrillic_filename(tmp_path: Path) -> None:
+    # русскоязычный продукт: кириллическое имя файла не должно превращаться в «___»
+    client = TestClient(create_app(config_path=tmp_path / "config.json"))
+    r = client.post(
+        "/upload",
+        data={"kind": "resume"},
+        files={"file": ("Моё резюме.pdf", b"%PDF data", "application/pdf")},
+    )
+    assert r.status_code == 200
+    assert r.json()["name"] == "Моё резюме.pdf"
+    assert (tmp_path / "uploads" / "resumes" / "Моё резюме.pdf").exists()
+
+
+def test_upload_then_path_used_in_valid_config(tmp_path: Path) -> None:
+    # путь из аплоада подставляется в форму и проходит валидацию конфига
+    from job_agent.config import load_config
+
+    cfg_path = tmp_path / "config.json"
+    client = TestClient(create_app(config_path=cfg_path))
+    up = client.post(
+        "/upload",
+        data={"kind": "resume"},
+        files={"file": ("cv.pdf", b"%PDF data", "application/pdf")},
+    ).json()
+    form = _single_track_form()
+    form["track_resume"] = up["path"]
+    r = client.post("/save", data=form)
+    assert r.status_code == 200
+    cfg = load_config(cfg_path)
+    assert cfg.tracks[0].resume_path == "uploads/resumes/cv.pdf"
+
+
 def test_settings_default_engine_is_cli(client: TestClient) -> None:
     body = client.get("/").text
     # дефолтный движок отмечен checked именно на CLI

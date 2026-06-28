@@ -46,6 +46,10 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "W"]
 
+[tool.ruff.lint.flake8-bugbear]
+# Идиома FastAPI: File()/Form()/Depends() как дефолты параметров (не B008).
+extend-immutable-calls = ["fastapi.File", "fastapi.Form", "fastapi.Depends"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "."]

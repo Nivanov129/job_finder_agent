@@ -12,10 +12,11 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from job_agent.config import ConfigError, load_config
@@ -24,6 +25,29 @@ from webui.forms import config_from_form
 from webui.render import render_results, render_settings, save_result_page
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+#: Тип загружаемого файла → подпапка в каталоге данных (рядом с config.json).
+#: Имена подпапок совпадают с дефолтными плейсхолдерами полей формы.
+_UPLOAD_DIRS = {
+    "resume": "resumes",
+    "template": "cover-templates",
+    "search_map": "search-map",
+}
+
+#: Потолок размера загрузки (UI бывает открыт в LAN — без авторизации).
+_MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+
+
+def _safe_filename(raw: str) -> str:
+    """Безопасное имя файла: только базовое имя, без обхода путей.
+
+    `Path(...).name` срезает любые каталоги (в т.ч. `../`). Опасные для пути и
+    управляющие символы заменяются на `_`, но Unicode-буквы сохраняются —
+    кириллические имена («Моё резюме.pdf») не калечатся. Пустое/служебное → `file`.
+    """
+    base = Path(raw or "").name
+    base = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', "_", base).strip(". ")
+    return base or "file"
 
 #: Базовый <head>: локальные стили + локальный webfont Tabler (НЕ CDN).
 _HEAD = """\
@@ -66,6 +90,26 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
         # Прогоны нигде не персистятся — пока нет данных, показываем пустое
         # состояние. Карточки собирает чистая `render_results` (юнит-тесты).
         return page(render_results([]))
+
+    @app.post("/upload")
+    async def upload(file: UploadFile = File(...), kind: str = Form(...)) -> JSONResponse:
+        # Кнопка «Загрузить» рядом с полем-путём кладёт файл в каталог данных и
+        # возвращает относительный путь, который JS подставляет в поле. Путь
+        # резолвится пайплайном относительно base_dir (= каталог config.json).
+        subdir = _UPLOAD_DIRS.get(kind)
+        if subdir is None:
+            return JSONResponse({"error": f"неизвестный тип файла: {kind}"}, status_code=400)
+        content = await file.read()
+        if len(content) > _MAX_UPLOAD_BYTES:
+            return JSONResponse(
+                {"error": f"файл больше {_MAX_UPLOAD_BYTES // (1024 * 1024)} МБ"},
+                status_code=413,
+            )
+        name = _safe_filename(file.filename or "")
+        dest_dir = target.parent / "uploads" / subdir
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        (dest_dir / name).write_bytes(content)
+        return JSONResponse({"path": f"uploads/{subdir}/{name}", "name": name})
 
     @app.post("/save", response_class=HTMLResponse)
     async def save(request: Request) -> HTMLResponse:
