@@ -170,9 +170,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 1.10: Web-поиск
-- [ ] `websearch/base.py` + `searxng.py` + `serp.py`, фабрика по `web_search.provider`, за интерфейсом.
-- [ ] Тесты на фейках.
-- [ ] Mark completed
+- [x] `websearch/base.py` + `searxng.py` + `serp.py`, фабрика по `web_search.provider`, за интерфейсом.
+- [x] Тесты на фейках.
+- [x] Mark completed
 
 ### Task 1.11: Скоринг
 - [ ] `scoring.py`: рендерит `prompts/scoring.md` с данными трека и вакансии, зовёт движок с web-поиском, парсит и валидирует JSON в `ScoreResult`; при `multi_track_scoring` — по обоим трекам, берёт больший `overall`; устойчивость к кривому JSON.
