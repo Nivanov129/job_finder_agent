@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -204,6 +204,7 @@ def run_pipeline(
     searcher: Searcher | None = None,
     min_sim: float = DEFAULT_MIN_SIM,
     limit: int = DEFAULT_LIMIT,
+    on_progress: Callable[[str, dict[str, int]], None] | None = None,
 ) -> RunResult:
     """Прогнать стадии 1–5 + xlsx за один проход.
 
@@ -217,6 +218,13 @@ def run_pipeline(
     embedder = embedder or Embedder()
     if collectors is None:
         collectors = build_collectors(config)
+
+    def _report(stage: str, **counts: int) -> None:
+        if on_progress is not None:
+            try:
+                on_progress(stage, counts)
+            except Exception:  # pragma: no cover - прогресс не роняет прогон
+                pass
 
     own_store = seen_store is None
     store = seen_store or SeenStore()
@@ -241,6 +249,7 @@ def run_pipeline(
         posts = _dedupe_raw_posts(posts)
         if len(posts) < collected:
             logger.info("повторы постов убраны: %d → %d", collected, len(posts))
+        _report("normalize", collected=collected)
 
         # 2. Нормализация.
         vacancies = normalize_posts(posts, engine, output_lang=config.output_lang)
@@ -264,6 +273,7 @@ def run_pipeline(
             limit=limit,
         )
         after_filter = len(routed)
+        _report("score", collected=collected, after_filter=after_filter)
 
         # 5. Скоринг финалистов.
         tracks_by_id = {t.id: t for t in config.tracks}

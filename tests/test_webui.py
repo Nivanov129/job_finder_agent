@@ -482,7 +482,7 @@ def test_save_backfill_starts_run_and_shows_run_page(tmp_path: Path) -> None:
     from webui.runner import BackfillRunner
 
     started: list[str] = []
-    runner = BackfillRunner(run=lambda p: started.append(str(p)) or {"written": 0})
+    runner = BackfillRunner(run=lambda p, prog: started.append(str(p)) or {"written": 0})
     client = TestClient(
         create_app(config_path=tmp_path / "config.json", backfill_runner=runner)
     )

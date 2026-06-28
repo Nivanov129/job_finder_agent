@@ -7,9 +7,11 @@
   function render(s) {
     if (s.status === "running") {
       box.className = "run-status";
-      box.innerHTML =
-        '<i class="ti ti-loader"></i> Прогон идёт… собрано ' + s.collected +
-        " · после фильтра " + s.after_filter;
+      var stages = { collect: "собираю вакансии", normalize: "нормализую (AI)", score: "скоринг (AI)" };
+      var label = stages[s.stage] || "идёт";
+      var nums = s.collected ? (" · собрано " + s.collected +
+        (s.after_filter ? " · финалистов " + s.after_filter : "")) : "";
+      box.innerHTML = '<i class="ti ti-loader"></i> Прогон: ' + label + "…" + nums;
     } else if (s.status === "done") {
       box.className = "run-status is-ok";
       var dl = s.output

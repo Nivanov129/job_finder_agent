@@ -17,7 +17,9 @@ def _wait(runner: BackfillRunner, timeout: float = 2.0) -> None:
 
 def test_runner_done_with_counters(tmp_path: Path) -> None:
     runner = BackfillRunner(
-        run=lambda p: {"collected": 5, "after_filter": 3, "written": 2, "output": "backfill.xlsx"}
+        run=lambda p, prog: {
+            "collected": 5, "after_filter": 3, "written": 2, "output": "backfill.xlsx"
+        }
     )
     assert runner.start(tmp_path / "config.json") is True
     _wait(runner)
@@ -28,7 +30,7 @@ def test_runner_done_with_counters(tmp_path: Path) -> None:
 
 
 def test_runner_error_surfaces_message(tmp_path: Path) -> None:
-    def boom(p: Path) -> dict:
+    def boom(p: Path, prog) -> dict:
         raise RuntimeError("резюме не найдено")
 
     runner = BackfillRunner(run=boom)
@@ -39,10 +41,30 @@ def test_runner_error_surfaces_message(tmp_path: Path) -> None:
     assert "резюме не найдено" in st["message"]
 
 
+def test_runner_progress_updates_state(tmp_path: Path) -> None:
+    gate = threading.Event()
+
+    def run(p: Path, prog) -> dict:
+        prog("normalize", {"collected": 7})
+        gate.wait(2.0)
+        return {"written": 1}
+
+    runner = BackfillRunner(run=run)
+    runner.start(tmp_path / "c.json")
+    for _ in range(200):  # ждём, пока прогресс долетит до состояния
+        if runner.state()["collected"] == 7:
+            break
+        time.sleep(0.01)
+    st = runner.state()
+    assert st["collected"] == 7 and st["stage"] == "normalize"
+    gate.set()
+    _wait(runner)
+
+
 def test_runner_single_run_at_a_time(tmp_path: Path) -> None:
     gate = threading.Event()
 
-    def blocking(p: Path) -> dict:
+    def blocking(p: Path, prog) -> dict:
         gate.wait(2.0)
         return {"collected": 1}
 
