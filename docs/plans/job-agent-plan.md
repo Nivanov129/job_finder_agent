@@ -155,9 +155,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 1.7: Дедуп
-- [ ] `dedup.py`: SQLite seen-store, ключ = хэш `title+company` + url, API `is_seen`/`mark_seen`, кросс-источник, идемпотентно. Путь к БД из конфига/env.
-- [ ] Тест на повторный прогон → ноль новых.
-- [ ] Mark completed
+- [x] `dedup.py`: SQLite seen-store, ключ = хэш `title+company` + url, API `is_seen`/`mark_seen`, кросс-источник, идемпотентно. Путь к БД из конфига/env.
+- [x] Тест на повторный прогон → ноль новых.
+- [x] Mark completed
 
 ### Task 1.8: Эмбеддинги
 - [ ] `embeddings.py`: обёртка fastembed (`bge-m3`), кэш векторов резюме треков и примеров карты за прогон, `cosine`. Модель фиксирована.
