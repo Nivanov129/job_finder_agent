@@ -165,10 +165,7 @@ def engine_config_from_form(
             token = _clean(form.get("claude_token", ""))
             if token:
                 secrets["CLAUDE_CODE_OAUTH_TOKEN"] = token
-        else:
-            key = _clean(form.get("codex_key", ""))
-            if key:
-                secrets["OPENAI_API_KEY"] = key
+        # codex авторизуется входом ChatGPT (`codex login`) — ключа-секрета нет.
     elif engine == "ollama":
         config["scoring_engine"] = "ollama"
         model = _clean(form.get("ollama_model", ""))

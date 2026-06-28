@@ -343,24 +343,32 @@ def _seed_config(client: TestClient) -> None:
     assert client.post("/save", data=_single_track_form()).status_code == 200
 
 
-def test_engine_save_codex_writes_config_and_secret(tmp_path: Path) -> None:
+def test_engine_save_codex_sets_cli_no_secret(tmp_path: Path) -> None:
     from job_agent.config import load_config
 
     cfg_path = tmp_path / "config.json"
     client = TestClient(create_app(config_path=cfg_path))
     _seed_config(client)
-    r = client.post(
-        "/engine/save", data={"engine": "codex", "codex_key": "sk-test-123"}
-    )
+    r = client.post("/engine/save", data={"engine": "codex"})
     assert r.status_code == 200
     cfg = load_config(cfg_path)
     assert cfg.scoring_engine == "cli" and cfg.cli_tool == "codex"
-    # секрет — в .env, НЕ в config.json
-    env = (tmp_path / ".env").read_text(encoding="utf-8")
-    assert "OPENAI_API_KEY=sk-test-123" in env
-    assert "sk-test-123" not in cfg_path.read_text(encoding="utf-8")
+    # codex авторизуется входом ChatGPT — ключа-секрета не пишем
+    assert not (tmp_path / ".env").exists() or "OPENAI_API_KEY" not in (
+        tmp_path / ".env"
+    ).read_text(encoding="utf-8")
     # треки из Настройки не потеряны при мерже
     assert len(cfg.tracks) == 1
+
+
+def test_engine_page_shows_only_selected_panel(client: TestClient) -> None:
+    body = client.get("/engine").text
+    # дефолт — claude: его панель видима, остальные скрыты (hidden)
+    assert '<div class="auth-panel" data-engine="claude">' in body
+    assert '<div class="auth-panel" data-engine="codex" hidden>' in body
+    assert '<div class="auth-panel" data-engine="ollama" hidden>' in body
+    # у codex больше нет поля ключа OPENAI_API_KEY
+    assert 'name="codex_key"' not in body
 
 
 def test_engine_save_ollama_uses_url_and_model(tmp_path: Path) -> None:

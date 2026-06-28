@@ -261,10 +261,18 @@ def _login_steps(steps: list[str]) -> str:
     return f'<ol class="auth-steps">{items}</ol>'
 
 
-def _auth_panel(key: str, title: str, hint_html: str, fields_html: str) -> str:
-    """Панель авторизации движка: статус-пилюли (JS заполнит) + поля/подсказки."""
+def _auth_panel(
+    key: str, title: str, hint_html: str, fields_html: str, *, visible: bool = False
+) -> str:
+    """Панель авторизации движка: статус-пилюли (JS заполнит) + поля/подсказки.
+
+    Видна только панель выбранного движка (`visible`); остальные скрыты —
+    JS переключает по выбору радио. Так UI показывает настройку и статус только
+    для текущего движка, а не все сразу.
+    """
+    hidden = "" if visible else " hidden"
     return (
-        f'<div class="auth-panel" data-engine="{key}">'
+        f'<div class="auth-panel" data-engine="{key}"{hidden}>'
         f'<div class="auth-panel__head"><span class="auth-panel__title">{escape(title)}</span>'
         f'<span class="auth-panel__status" data-status="{key}">'
         f'{status_pill(ok=False, text="проверяю…", unknown=True)}</span></div>'
@@ -285,7 +293,6 @@ def render_engine(
     ollama_model: str = "",
     web_search_url: str = "",
     has_claude_token: bool = False,
-    has_codex_key: bool = False,
     has_ollama_key: bool = False,
 ) -> str:
     """Экран «AI · авторизация»: выбор движка, статус, авторизация, web-поиск.
@@ -330,18 +337,20 @@ def render_engine(
         "тогда поле токена не нужно.</div>",
         secret_field("claude_token", "CLAUDE_CODE_OAUTH_TOKEN", "вставьте токен",
                      has=has_claude_token),
+        visible=active == "claude",
     )
     codex_panel = _auth_panel(
         "codex",
-        "Codex — нужна подписка",
+        "Codex — нужна подписка (вход через ChatGPT)",
         _login_steps([
-            f"Выполните {_copy_cmd('codex login')} — вход через браузер "
-            f"(или сразу ключом: {_copy_cmd('codex login --api-key КЛЮЧ')}).",
-            "Авторизуйтесь (нужна подписка) — либо вставьте ключ "
-            "<code>OPENAI_API_KEY</code> в поле ниже.",
-            "«Сохранить» — проверится автоматически.",
+            f"На хосте в смонтированном каталоге выполните {_copy_cmd('codex login')} "
+            "— откроется вход через браузер (аккаунт ChatGPT, без API-ключа).",
+            "Авторизуйтесь — вход сохранится в каталоге Codex "
+            "(<code>JOB_AGENT_CODEX_DIR</code>).",
+            "«Проверить» — убедиться, что вход подхватился.",
         ]),
-        secret_field("codex_key", "OPENAI_API_KEY", "вставьте ключ", has=has_codex_key),
+        "",  # codex авторизуется по входу ChatGPT, поля ключа нет
+        visible=active == "codex",
     )
     ollama_panel = _auth_panel(
         "ollama",
@@ -365,6 +374,7 @@ def render_engine(
         f'<input class="input" name="ollama_url" value="{escape(ollama_url)}" '
         'placeholder="оставьте пустым для облака · http://host.docker.internal:11434">'
         "</label>",
+        visible=active == "ollama",
     )
     web = (
         '<section class="card">'

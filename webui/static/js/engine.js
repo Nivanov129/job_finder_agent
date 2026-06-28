@@ -86,6 +86,19 @@
       });
   }
 
+  // Показывать панель только выбранного движка (настройка+статус для него).
+  function togglePanels() {
+    var sel = document.querySelector('input[name="engine"]:checked');
+    var key = sel ? sel.value : "";
+    document.querySelectorAll(".auth-panel[data-engine]").forEach(function (p) {
+      p.hidden = p.getAttribute("data-engine") !== key;
+    });
+  }
+
+  document.addEventListener("change", function (ev) {
+    if (ev.target && ev.target.name === "engine") togglePanels();
+  });
+
   document.addEventListener("click", function (ev) {
     // Кнопка «копировать команду».
     var copyBtn = ev.target.closest(".copy-cmd");
@@ -112,6 +125,7 @@
     if (key) runProbe(key, el, "autoverify");
   }
 
+  togglePanels();
   loadStatus();
   loadOllamaModels();
   autoVerify();

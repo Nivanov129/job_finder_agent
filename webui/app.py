@@ -121,7 +121,6 @@ def create_app(config_path: Path | str | None = None) -> FastAPI:
                 has_claude_token=bool(
                     env.get("CLAUDE_CODE_OAUTH_TOKEN") or env.get("ANTHROPIC_API_KEY")
                 ),
-                has_codex_key=bool(env.get("OPENAI_API_KEY")),
                 has_ollama_key=bool(env.get("OLLAMA_API_KEY")),
             ),
             scripts='<script src="/static/js/engine.js"></script>',
