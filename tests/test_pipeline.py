@@ -130,12 +130,12 @@ def _config(tmp_path: Path, *, single_track: bool) -> Config:
 def _collectors(config: Config):
     tme_html = (FIXTURES / "tme_channel.html").read_text(encoding="utf-8")
     vseti_html = (FIXTURES / "vseti_jobs.html").read_text(encoding="utf-8")
-    getmatch_json = (FIXTURES / "getmatch_vacancies.json").read_text(encoding="utf-8")
+    habr_html = (FIXTURES / "habr_vacancies.html").read_text(encoding="utf-8")
     return build_collectors(
         config,
         public_fetcher=lambda url: tme_html,
         vseti_fetcher=lambda url: vseti_html,
-        getmatch_fetcher=lambda url: getmatch_json,
+        habr_fetcher=lambda url: habr_html,
     )
 
 

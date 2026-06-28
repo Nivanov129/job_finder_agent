@@ -20,7 +20,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from .collectors.base import Collector
-from .collectors.getmatch import GetmatchCollector
+from .collectors.habr import HabrCollector
 from .collectors.telegram_private import (
     creds_from_env,
     creds_present,
@@ -146,12 +146,13 @@ def build_collectors(
     public_fetcher=None,
     private_fetcher=None,
     vseti_fetcher=None,
-    getmatch_fetcher=None,
+    habr_fetcher=None,
 ) -> list[Collector]:
     """Собрать коллекторы по конфигу (стадия 1). Фетчеры инъектируются в тестах.
 
     Публичные TG-каналы — через `t.me/s/`; приватные — Telethon (только при
-    creds или инъекции fetcher); агрегаторы — при `use_aggregators`.
+    creds или инъекции fetcher); агрегаторы — при `use_aggregators`: vseti.app и
+    career.habr.com (getmatch отключён — их публичный API больше не доступен).
     """
     collectors: list[Collector] = []
 
@@ -173,7 +174,7 @@ def build_collectors(
 
     if config.use_aggregators:
         collectors.append(VsetiCollector(fetcher=vseti_fetcher))
-        collectors.append(GetmatchCollector(fetcher=getmatch_fetcher))
+        collectors.append(HabrCollector(fetcher=habr_fetcher))
 
     return collectors
 

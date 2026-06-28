@@ -6,15 +6,21 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from job_agent.collectors.getmatch import GetmatchCollector, parse_getmatch_json
+from job_agent.collectors.habr import HabrCollector, parse_habr_html
 from job_agent.collectors.vseti import VsetiCollector, parse_vseti_html
 
 FIXTURES = Path(__file__).parent / "fixtures"
 VSETI_HTML = FIXTURES / "vseti_jobs.html"
+HABR_HTML = FIXTURES / "habr_vacancies.html"
 GETMATCH_JSON = FIXTURES / "getmatch_vacancies.json"
 
 
 def _vseti_html() -> str:
     return VSETI_HTML.read_text(encoding="utf-8")
+
+
+def _habr_html() -> str:
+    return HABR_HTML.read_text(encoding="utf-8")
 
 
 def _getmatch_json() -> str:
@@ -24,40 +30,67 @@ def _getmatch_json() -> str:
 # --- vseti -------------------------------------------------------------------
 
 
-def test_vseti_parse_extracts_fields_and_skips_titleless() -> None:
+def test_vseti_parse_extracts_cards_and_skips_empty() -> None:
     posts = parse_vseti_html(_vseti_html())
 
-    # карточка без заголовка (204) отброшена
-    assert len(posts) == 3
+    # пустая карточка-ссылка (203) отброшена
+    assert len(posts) == 2
 
     first = posts[0]
     assert first.source == "vseti"
-    assert first.url == "https://vseti.app/vacancy/201-product-manager"
-    assert first.date == datetime(2024, 6, 25, 8, 0, tzinfo=UTC)
+    assert first.url == "https://www.vseti.app/vakansii/201"
+    assert first.date is None  # листинг свежий, дата в карточке не указана
+    # весь текст карточки — материал для нормализации
     assert "Product Manager" in first.raw_text
     assert "AlphaScale" in first.raw_text
     assert "300000" in first.raw_text
     assert "retention" in first.raw_text
-    assert "\n" in first.raw_text  # <br> и поля → переводы строк
 
-    # абсолютная ссылка сохраняется как есть
-    second = posts[1]
-    assert second.url == "https://vseti.app/vacancy/202-head-of-ai"
+    # относительная ссылка достраивается до абсолютной
+    assert posts[1].url == "https://vseti.app/vakansii/202"
+    assert "Head of AI" in posts[1].raw_text
 
 
-def test_vseti_fetch_filters_by_since() -> None:
+def test_vseti_fetch_returns_all_when_no_dates() -> None:
     collector = VsetiCollector(fetcher=lambda _u: _vseti_html())
-
+    # дата карточек None → since не отсекает (листинг всегда свежий)
     posts = collector.fetch(datetime(2024, 6, 1, tzinfo=UTC))
-    # архивная карточка 203 (1 мая) отсечена
     assert {p.url for p in posts} == {
-        "https://vseti.app/vacancy/201-product-manager",
-        "https://vseti.app/vacancy/202-head-of-ai",
+        "https://www.vseti.app/vakansii/201",
+        "https://vseti.app/vakansii/202",
     }
 
 
 def test_vseti_garbage_html_yields_nothing() -> None:
     assert parse_vseti_html("<html><body>no cards here</body></html>") == []
+
+
+# --- habr --------------------------------------------------------------------
+
+
+def test_habr_parse_extracts_cards_and_skips_empty() -> None:
+    posts = parse_habr_html(_habr_html())
+
+    assert len(posts) == 2  # пустая карточка отброшена
+    first = posts[0]
+    assert first.source == "habr"
+    assert first.url == "https://career.habr.com/vacancies/100200"
+    assert first.date == datetime(2026, 6, 28, 23, 26, 11, tzinfo=first.date.tzinfo)
+    assert "Product Manager" in first.raw_text
+    assert "AlphaScale" in first.raw_text
+    assert "300000" in first.raw_text
+    assert posts[1].url == "https://career.habr.com/vacancies/100201"
+
+
+def test_habr_fetch_filters_by_since() -> None:
+    collector = HabrCollector(fetcher=lambda _u: _habr_html())
+    posts = collector.fetch(datetime(2024, 6, 1, tzinfo=UTC))
+    # карточка от 2024-05-01 отсечена по дате
+    assert {p.url for p in posts} == {"https://career.habr.com/vacancies/100200"}
+
+
+def test_habr_garbage_html_yields_nothing() -> None:
+    assert parse_habr_html("<html><body>no cards</body></html>") == []
 
 
 # --- getmatch ----------------------------------------------------------------

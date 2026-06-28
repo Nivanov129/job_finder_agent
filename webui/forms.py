@@ -70,17 +70,6 @@ def _tracks_from_form(form: FormLike) -> list[dict[str, Any]]:
     return tracks
 
 
-def _channels_from_form(form: FormLike) -> list[dict[str, Any]]:
-    """Каналы из textarea (по строке на канал, ведущий `@` снимается)."""
-    raw = _clean(form.get("channels", ""))
-    channels: list[dict[str, Any]] = []
-    for line in raw.splitlines():
-        handle = line.strip().lstrip("@").strip()
-        if handle:
-            channels.append({"handle": handle, "private": False})
-    return channels
-
-
 def _output_mode(form: FormLike) -> str:
     table = bool(form.get("out_table"))
     bot = bool(form.get("out_bot"))
@@ -115,10 +104,8 @@ def config_from_form(form: FormLike) -> dict[str, Any]:
     if global_disq:
         data["global_disqualifiers"] = global_disq
 
-    # Источники.
-    channels = _channels_from_form(form)
-    if channels:
-        data["tg_channels"] = channels
+    # Источники. Каналы берём только из Telegram-подписок (на странице /telegram,
+    # private), поэтому форма Настройки их не несёт — мерж в /save их сохраняет.
     data["use_aggregators"] = bool(form.get("use_aggregators"))
 
     # Движок AI и web-поиск — на отдельной странице (engine_config_from_form),

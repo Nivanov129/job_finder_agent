@@ -44,92 +44,62 @@ def _as_aware(dt: datetime) -> datetime:
     return dt
 
 
-# Поля карточки и классы их контейнеров. Текст внутри контейнера накапливается,
-# пока активен соответствующий `div`/`a` (по глубине вложенности).
-_FIELD_CLASSES = {
-    "title": "vacancy-card__title",
-    "company": "vacancy-card__company",
-    "salary": "vacancy-card__salary",
-    "description": "vacancy-card__description",
+# vseti.app — Webflow CMS: каждая вакансия — ссылка `a.card-jobs` на `/vakansii/<id>`,
+# внутри весь текст карточки (должность, компания, зарплата, формат, теги). Берём
+# href как url и весь текст карточки как `raw_text` — нормализация вытащит поля.
+_CARD_CLASS = "card-jobs"
+# Блочные теги — на границах вставляем перенос, чтобы текст не слипался.
+_BLOCK_TAGS = {"div", "p", "h1", "h2", "h3", "h4", "li", "br", "span"}
+# Void-элементы (без закрывающего тега) — не считаем во вложенность, иначе
+# глубина «уплывает» и закрытие карточки `</a>` не ловится.
+_VOID_TAGS = {
+    "br", "img", "input", "hr", "meta", "link", "source", "wbr", "col",
+    "area", "base", "embed", "track", "param",
 }
 
 
 class _VsetiParser(HTMLParser):
-    """Извлекает карточки `div.vacancy-card` со страницы листинга vseti.app.
-
-    Заголовок — ссылка `a.vacancy-card__title` (даёт текст и `href`), остальные
-    поля — текст одноимённых контейнеров, дата — `time[datetime]` внутри карточки.
-    """
+    """Извлекает карточки-ссылки `a.card-jobs` со страницы листинга vseti.app."""
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.cards: list[dict] = []
         self._cur: dict | None = None
-        self._depth = 0
-        # имя поля, которое сейчас собираем, и глубина его открывающего тега
-        self._field: str | None = None
-        self._field_depth = 0
-
-    @staticmethod
-    def _classes(attrs: dict[str, str | None]) -> set[str]:
-        return set((attrs.get("class") or "").split())
-
-    def _flush(self) -> None:
-        if self._cur is not None:
-            for key in ("title", "company", "salary", "description"):
-                self._cur[key] = "".join(self._cur[f"{key}_parts"]).strip()
-                del self._cur[f"{key}_parts"]
-            self.cards.append(self._cur)
-            self._cur = None
-            self._field = None
-
-    def _start_field(self, name: str) -> None:
-        if self._cur is not None and self._field is None:
-            self._field = name
-            self._field_depth = self._depth
+        self._depth = 0  # вложенность тегов внутри активной карточки-ссылки
 
     def handle_starttag(self, tag: str, attrs_list: list[tuple[str, str | None]]) -> None:
         attrs = dict(attrs_list)
-        cls = self._classes(attrs)
-        if tag == "div":
-            self._depth += 1
-            if "vacancy-card" in cls:
-                self._flush()
-                self._cur = {
-                    "title_parts": [],
-                    "company_parts": [],
-                    "salary_parts": [],
-                    "description_parts": [],
-                    "url": None,
-                    "datetime": None,
-                }
-            else:
-                for name, klass in _FIELD_CLASSES.items():
-                    if name != "title" and klass in cls:
-                        self._start_field(name)
-                        break
-        elif tag == "a" and self._cur is not None and "vacancy-card__title" in cls:
-            self._depth += 1
-            href = attrs.get("href")
-            if href and not self._cur["url"]:
-                self._cur["url"] = href if href.startswith("http") else f"{_BASE}{href}"
-            self._start_field("title")
-        elif tag == "time" and self._cur is not None:
-            dt = attrs.get("datetime")
-            if dt and not self._cur["datetime"]:
-                self._cur["datetime"] = dt
-        elif tag == "br" and self._field is not None and self._cur is not None:
-            self._cur[f"{self._field}_parts"].append("\n")
+        cls = attrs.get("class") or ""
+        if tag == "a" and _CARD_CLASS in cls and self._cur is None:
+            href = (attrs.get("href") or "").strip()
+            if href and not href.startswith("http"):
+                href = f"{_BASE}{href}"
+            self._cur = {"url": href, "parts": []}
+            self._depth = 0
+            return
+        if self._cur is not None:
+            if tag not in _VOID_TAGS:
+                self._depth += 1
+            if tag in _BLOCK_TAGS:
+                self._cur["parts"].append("\n")
 
     def handle_endtag(self, tag: str) -> None:
-        if tag in ("div", "a"):
-            if self._field is not None and self._depth == self._field_depth:
-                self._field = None
+        if self._cur is None:
+            return
+        if tag == "a" and self._depth == 0:
+            self._flush()
+        elif tag not in _VOID_TAGS and self._depth > 0:
             self._depth -= 1
 
     def handle_data(self, data: str) -> None:
-        if self._field is not None and self._cur is not None:
-            self._cur[f"{self._field}_parts"].append(data)
+        if self._cur is not None:
+            self._cur["parts"].append(data)
+
+    def _flush(self) -> None:
+        if self._cur is not None:
+            text = " ".join("".join(self._cur["parts"]).split())
+            self.cards.append({"url": self._cur["url"], "text": text})
+            self._cur = None
 
     def close(self) -> None:  # type: ignore[override]
         super().close()
@@ -137,11 +107,12 @@ class _VsetiParser(HTMLParser):
 
 
 def parse_vseti_html(html: str) -> list[RawPost]:
-    """Распарсить страницу листинга vseti.app в список постов.
+    """Распарсить листинг vseti.app в список постов.
 
-    Карточки без заголовка отбрасываются. `raw_text` собирается из полей карточки
-    (заголовок · компания · зарплата · описание) — материал для стадии нормализации.
-    Дата парсится из ISO-8601 (tz-aware), отсутствие/мусор → `None`.
+    Каждая карточка-ссылка `a.card-jobs` → один `RawPost`: весь текст карточки как
+    `raw_text` (материал для нормализации), href как url. Дата не указана в карточке
+    (листинг свежий) → `None`, т.е. пост не отсекается по `since`. Пустые карточки
+    пропускаются.
     """
     parser = _VsetiParser()
     parser.feed(html)
@@ -149,25 +120,10 @@ def parse_vseti_html(html: str) -> list[RawPost]:
 
     posts: list[RawPost] = []
     for card in parser.cards:
-        title = card["title"]
-        if not title:
+        text = card["text"]
+        if len(text) < 5 or not card["url"]:
             continue
-        lines = [title]
-        for key in ("company", "salary", "description"):
-            if card[key]:
-                lines.append(card[key])
-        raw_text = "\n".join(lines)
-
-        date: datetime | None = None
-        if card["datetime"]:
-            try:
-                date = datetime.fromisoformat(card["datetime"])
-            except ValueError:
-                date = None
-
-        posts.append(
-            RawPost(raw_text=raw_text, source="vseti", url=card["url"], date=date)
-        )
+        posts.append(RawPost(raw_text=text, source="vseti", url=card["url"], date=None))
     return posts
 
 

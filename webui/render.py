@@ -179,8 +179,7 @@ def _profile_card(tracks: list[dict] | None = None, search_map_path: str = "") -
 
 
 def _sources_card(
-    channels: str = "", use_aggregators: bool = True,
-    private_handles: list[str] | None = None,
+    use_aggregators: bool = True, private_handles: list[str] | None = None,
 ) -> str:
     agg = " checked" if use_aggregators else ""
     chip_cls = "chip chip--on" if use_aggregators else "chip"
@@ -191,28 +190,24 @@ def _sources_card(
             for h in private_handles
         )
         tg_block = (
-            '<div class="field__label">Приватные каналы из твоего Telegram '
+            '<div class="field__label">Твои Telegram-каналы '
             f"(<b>{len(private_handles)}</b>) · меняются на странице "
             '<a href="/telegram">Telegram</a></div>'
             f'<div class="chip-list">{chips}</div>'
         )
     else:
         tg_block = (
-            '<div class="card__meta">Приватные каналы — на странице '
-            '<a href="/telegram">Telegram</a> (вход в аккаунт + авто-подбор).</div>'
+            '<div class="card__meta">Каналы берём из твоего Telegram (на что подписан) '
+            '— войди и выбери на странице <a href="/telegram">Telegram</a>.</div>'
         )
     return (
         '<section class="card">'
         f'<div class="card__title">{icon("ti-rss")} Источники</div>'
-        '<label class="field"><span class="field__label">Публичные Telegram-каналы '
-        "(по одному в строке)</span>"
-        '<textarea class="input" name="channels" rows="3" '
-        f'placeholder="@ml_jobs&#10;@product_jobs">{escape(channels)}</textarea></label>'
         + tg_block
         + '<div class="field__label">Агрегаторы</div>'
         f'<label class="chip-toggle"><input type="checkbox" name="use_aggregators"{agg}>'
         f'<span class="{chip_cls}">{icon("ti-rss")} vseti.app</span>'
-        f'<span class="{chip_cls}">{icon("ti-rss")} getmatch</span></label>'
+        f'<span class="{chip_cls}">{icon("ti-rss")} career.habr</span></label>'
         "</section>"
     )
 
@@ -284,11 +279,6 @@ def render_settings(cfg: dict | None = None) -> str:
     cfg = cfg or {}
     tracks = cfg.get("tracks") or []
     search_map_path = (cfg.get("search_map") or {}).get("path", "")
-    public_channels = "\n".join(
-        c.get("handle", "")
-        for c in (cfg.get("tg_channels") or [])
-        if not c.get("private")
-    )
     private_handles = [
         c.get("handle", "")
         for c in (cfg.get("tg_channels") or [])
@@ -300,9 +290,7 @@ def render_settings(cfg: dict | None = None) -> str:
         + _warning()
         + '<form method="post" action="/save">'
         + _profile_card(tracks, search_map_path)
-        + _sources_card(
-            public_channels, cfg.get("use_aggregators", True), private_handles
-        )
+        + _sources_card(cfg.get("use_aggregators", True), private_handles)
         + _engine_pointer()
         + _output_card(
             out_table=mode in ("table", "both"),
