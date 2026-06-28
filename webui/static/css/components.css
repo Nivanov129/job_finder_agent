@@ -280,6 +280,15 @@
   min-width: 160px;
 }
 
+.login-device-code {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  padding: 2px 8px;
+  background: var(--surface-1);
+  border-radius: 4px;
+}
+
 .login-flow__msg {
   font-size: 12px;
   color: var(--text-secondary);

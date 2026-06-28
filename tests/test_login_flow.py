@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from webui.env_store import parse_env
-from webui.login_flow import LoginManager, LoginProcess, LoginResult
+from webui.login_flow import URL_RE, LoginManager, LoginProcess, LoginResult
 
 
 class _FakeClaude:
@@ -14,8 +15,8 @@ class _FakeClaude:
     def __init__(self) -> None:
         self._code: str | None = None
 
-    def read_url(self, timeout: float) -> str | None:
-        return "https://claude.ai/oauth/authorize?code=1"
+    def read(self, pattern: re.Pattern[str], timeout: float) -> str | None:
+        return "https://claude.ai/oauth/authorize?code=1" if pattern is URL_RE else None
 
     def submit_code(self, code: str) -> None:
         self._code = code
@@ -30,12 +31,12 @@ class _FakeClaude:
 
 
 class _FakeCodex:
-    """Имитирует codex login: ссылка → завершение по браузеру (без токена)."""
+    """Имитирует codex device-auth: ссылка + одноразовый код, завершение по браузеру."""
 
-    def read_url(self, timeout: float) -> str | None:
-        return "https://auth.openai.com/oauth?x=1"
+    def read(self, pattern: re.Pattern[str], timeout: float) -> str | None:
+        return "https://auth.openai.com/codex/device" if pattern is URL_RE else "CVBJ-2XUDK"
 
-    def submit_code(self, code: str) -> None:  # codex код не вводит
+    def submit_code(self, code: str) -> None:  # codex код в нашу форму не вводит
         pass
 
     def result(self, timeout: float) -> LoginResult:
@@ -66,11 +67,13 @@ def test_claude_submit_writes_token_to_env(tmp_path: Path) -> None:
     assert parse_env(env)["CLAUDE_CODE_OAUTH_TOKEN"] == "sk-ant-oat01-FAKE"
 
 
-def test_codex_callback_mode_no_token(tmp_path: Path) -> None:
+def test_codex_device_mode_shows_code_no_token(tmp_path: Path) -> None:
     env = tmp_path / ".env"
     mgr = LoginManager(env, spawn=_spawn)
     started = mgr.start("codex")
-    assert started["mode"] == "callback"
+    assert started["mode"] == "device"
+    assert started["code"] == "CVBJ-2XUDK"  # одноразовый код для ввода в браузере
+    assert "auth.openai.com" in str(started["url"])
     res = mgr.submit("codex")  # без кода — ждём подтверждения браузера
     assert res["ok"] is True
     # codex сам пишет auth.json, токена в .env нет

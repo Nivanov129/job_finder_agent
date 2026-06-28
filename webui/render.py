@@ -349,8 +349,9 @@ def render_engine(
     codex_panel = _auth_panel(
         "codex",
         "Codex — вход через ChatGPT (без API-ключа)",
-        "Вход в один клик: сервер запустит <code>codex login</code> и покажет "
-        "ссылку — авторизуйтесь в браузере по аккаунту ChatGPT, вход сохранится."
+        "Вход в один клик: сервер запустит <code>codex login --device-auth</code>, "
+        "покажет ссылку и одноразовый код — откройте ссылку, введите код в браузере "
+        "(аккаунт ChatGPT), затем нажмите «Я ввёл код»."
         + _login_widget("codex"),
         "",  # codex авторизуется по входу ChatGPT, поля ключа нет
         visible=active == "codex",

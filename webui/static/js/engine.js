@@ -93,22 +93,28 @@
     var link =
       '<a class="btn" href="' + data.url + '" target="_blank" rel="noopener">' +
       '<i class="ti ti-external-link"></i> Открыть вход</a>';
-    var action;
-    if (data.mode === "code") {
-      action =
+    var rows = '<div class="login-flow__row">' + link + "</div>";
+    if (data.mode === "device") {
+      // codex: показываем одноразовый код для ввода в браузере, затем ждём.
+      if (data.code)
+        rows +=
+          '<div class="login-flow__row">Код для ввода в браузере: ' +
+          '<code class="login-device-code">' + data.code + "</code></div>";
+      rows +=
+        '<div class="login-flow__row"><button type="button" ' +
+        'class="btn btn--accent login-submit" data-engine="' + engine +
+        '">Я ввёл код — проверить</button></div>';
+    } else {
+      // claude: пользователь получает код в браузере и вставляет его сюда.
+      rows +=
+        '<div class="login-flow__row">' +
         '<input class="input login-code" data-engine="' + engine +
         '" placeholder="вставьте код из браузера">' +
         '<button type="button" class="btn btn--accent login-submit" data-engine="' +
-        engine + '">Готово</button>';
-    } else {
-      action =
-        '<button type="button" class="btn btn--accent login-submit" data-engine="' +
-        engine + '">Я авторизовался</button>';
+        engine + '">Готово</button></div>';
     }
     out.innerHTML =
-      '<div class="login-flow__row">' + link + "</div>" +
-      '<div class="login-flow__row">' + action + "</div>" +
-      '<div class="login-flow__msg" data-login-msg="' + engine + '"></div>';
+      rows + '<div class="login-flow__msg" data-login-msg="' + engine + '"></div>';
   }
 
   function setLoginMsg(engine, text, cls) {

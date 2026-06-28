@@ -386,7 +386,7 @@ def _login_app(tmp_path: Path):
         def __init__(self) -> None:
             self._code = None
 
-        def read_url(self, timeout: float):
+        def read(self, pattern, timeout: float):
             return "https://claude.ai/oauth?x=1"
 
         def submit_code(self, code: str) -> None:

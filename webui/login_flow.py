@@ -30,24 +30,33 @@ __all__ = [
     "LOGIN_ENGINES",
     "URL_RE",
     "CLAUDE_TOKEN_RE",
+    "DEVICE_CODE_RE",
     "default_spawner",
     "LOGIN_ARGV",
 ]
 
-# Команда входа на движок (неинтерактивный запуск пишет в stdin/stdout).
+# Команда входа на движок. codex — device-auth: без localhost-callback, годится
+# для headless/контейнера (обычный `codex login` шлёт callback на localhost,
+# недостижимый из браузера пользователя).
 LOGIN_ARGV: dict[str, list[str]] = {
     "claude": ["claude", "setup-token"],
-    "codex": ["codex", "login"],
+    "codex": ["codex", "login", "--device-auth"],
 }
 
-# Движки с server-driven входом и режим завершения: code — ввод кода + токен в
-# stdout (claude); callback — вход завершается в браузере, ждём выход (codex).
-LOGIN_ENGINES: dict[str, str] = {"claude": "code", "codex": "callback"}
+# Режим входа на движок:
+#  code   — claude setup-token: пользователь получает код в браузере → вводит в
+#           нашу форму → код уходит в stdin → ловим токен в stdout.
+#  device — codex login --device-auth: показываем ссылку + одноразовый код,
+#           пользователь вводит код в браузере, CLI сам опрашивает и завершается
+#           (без localhost-callback — работает headless/из контейнера).
+LOGIN_ENGINES: dict[str, str] = {"claude": "code", "codex": "device"}
 # Куда кладётся пойманный токен (codex токен не печатает — пишет auth.json сам).
 _TOKEN_ENV_KEY: dict[str, str] = {"claude": "CLAUDE_CODE_OAUTH_TOKEN"}
 
 URL_RE = re.compile(r"https?://[^\s'\"<>]+")
 CLAUDE_TOKEN_RE = re.compile(r"sk-ant-oat[0-9A-Za-z_-]+")
+# Одноразовый device-код codex, напр. «CVBJ-2XUDK».
+DEVICE_CODE_RE = re.compile(r"\b[A-Z0-9]{4,6}-[A-Z0-9]{4,6}\b")
 
 
 @dataclass
@@ -62,8 +71,8 @@ class LoginResult:
 class LoginProcess(Protocol):
     """Интерфейс запущенного процесса входа (реальный Popen или фейк в тестах)."""
 
-    def read_url(self, timeout: float) -> str | None:
-        """Дождаться и вернуть OAuth-ссылку из вывода (или None по таймауту)."""
+    def read(self, pattern: re.Pattern[str], timeout: float) -> str | None:
+        """Дождаться совпадения `pattern` в выводе (ссылка/код) или None по таймауту."""
         ...
 
     def submit_code(self, code: str) -> None:
@@ -115,11 +124,16 @@ class LoginManager:
         except Exception as exc:  # pragma: no cover - неожиданный сбой старта
             return {"ok": False, "message": f"не удалось запустить вход: {exc}"}
         self._active[engine] = proc
-        url = proc.read_url(self._url_timeout)
+        url = proc.read(URL_RE, self._url_timeout)
         if not url:
             self._stop(engine)
             return {"ok": False, "message": "не удалось получить ссылку входа"}
-        return {"ok": True, "url": url, "mode": LOGIN_ENGINES[engine]}
+        url = url.rstrip(".,;)")  # отрезать пунктуацию, прилипшую из текста
+        mode = LOGIN_ENGINES[engine]
+        out: dict[str, object] = {"ok": True, "url": url, "mode": mode}
+        if mode == "device":  # codex показывает одноразовый код рядом со ссылкой
+            out["code"] = proc.read(DEVICE_CODE_RE, 5.0) or ""
+        return out
 
     def submit(self, engine: str, code: str = "") -> dict[str, object]:
         """Завершить вход: для 'code' отправить код, дождаться токена/выхода.
@@ -150,37 +164,69 @@ class LoginManager:
 
 # ── Реальный процесс входа (вне юнит-тестов) ──────────────────────────────────
 
+# claude/codex — полноэкранные TUI: без TTY они не печатают ничего, а ссылку/токен
+# терминал переносит по ширине окна. Поэтому процесс запускается под PTY с очень
+# широким окном (URL и токен не разрываются), а ANSI-последовательности срезаются.
+_ANSI_RE = re.compile(
+    r"\x1b\[[0-9;?]*[ -/]*[@-~]"  # CSI (включая ?-приватные, напр. ?25h)
+    r"|\x1b[\]PX^_][^\x07\x1b]*(?:\x07|\x1b\\)"  # OSC/DCS до терминатора
+    r"|\x1b[@-Z\\-_=>78]"  # двухсимвольные escape
+)
+_PTY_COLS = 4000  # шире любой ссылки/токена — чтобы терминал не переносил строку
 
-class _PopenLogin:  # pragma: no cover - реальный процесс/IO
-    """Обёртка над `subprocess.Popen`: фоновый поток копит вывод, методы сканируют.
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI_RE.sub("", text)
+
+
+class _PtyLogin:  # pragma: no cover - реальный процесс/PTY/IO
+    """Запуск CLI-входа под PTY: фоновый поток копит очищенный вывод, методы сканируют.
 
     Реальная граница — в юнит-тестах подменяется фейком через `LoginSpawner`.
     """
 
     def __init__(self, engine: str, argv: list[str], env: dict[str, str]) -> None:
+        import fcntl
+        import os
+        import pty
+        import struct
         import subprocess
+        import termios
         import threading
 
         self._engine = engine
         self._buf = ""
         self._lock = threading.Lock()
+        self._os = os
+
+        self._master, slave = pty.openpty()
+        # Широкое и высокое окно: ссылка/токен печатаются одной строкой.
+        winsize = struct.pack("HHHH", 200, _PTY_COLS, 0, 0)
+        fcntl.ioctl(slave, termios.TIOCSWINSZ, winsize)
         self._proc = subprocess.Popen(
             argv,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
+            stdin=slave,
+            stdout=slave,
+            stderr=slave,
             env=env,
+            close_fds=True,
+            start_new_session=True,
         )
+        os.close(slave)
         self._reader = threading.Thread(target=self._pump, daemon=True)
         self._reader.start()
 
     def _pump(self) -> None:
-        assert self._proc.stdout is not None
-        for line in self._proc.stdout:
+        while True:
+            try:
+                data = self._os.read(self._master, 4096)
+            except OSError:
+                break  # EIO после выхода процесса
+            if not data:
+                break
+            text = _strip_ansi(data.decode("utf-8", "replace"))
             with self._lock:
-                self._buf += line
+                self._buf += text
 
     def _scan(self, pattern: re.Pattern[str]) -> str | None:
         with self._lock:
@@ -200,13 +246,12 @@ class _PopenLogin:  # pragma: no cover - реальный процесс/IO
             time.sleep(0.2)
         return None
 
-    def read_url(self, timeout: float) -> str | None:
-        return self._wait_for(URL_RE, timeout)
+    def read(self, pattern: re.Pattern[str], timeout: float) -> str | None:
+        return self._wait_for(pattern, timeout)
 
     def submit_code(self, code: str) -> None:
-        if self._proc.stdin:
-            self._proc.stdin.write(code.rstrip("\n") + "\n")
-            self._proc.stdin.flush()
+        # Ввод в TUI завершается Enter — в raw-TTY это возврат каретки.
+        self._os.write(self._master, (code.strip() + "\r").encode("utf-8"))
 
     def result(self, timeout: float) -> LoginResult:
         import time
@@ -231,18 +276,26 @@ class _PopenLogin:  # pragma: no cover - реальный процесс/IO
         try:
             if self._proc.poll() is None:
                 self._proc.terminate()
-        except Exception:
-            pass
+        finally:
+            try:
+                self._os.close(self._master)
+            except OSError:
+                pass
 
 
 def default_spawner(envfile: Path | str) -> LoginSpawner:  # pragma: no cover - IO
-    """Спавнер реальных процессов: env берётся из окружения + `.env`."""
+    """Спавнер реальных процессов: env берётся из окружения + `.env`.
+
+    `TERM` задаётся (CLI-агенты ждут терминал), браузер не открываем — нужна только
+    ссылка для пользователя.
+    """
     import os
 
     from .env_store import parse_env
 
     def spawn(engine: str) -> LoginProcess:
         env = {**os.environ, **parse_env(envfile)}
-        return _PopenLogin(engine, LOGIN_ARGV[engine], env)
+        env.setdefault("TERM", "xterm-256color")
+        return _PtyLogin(engine, LOGIN_ARGV[engine], env)
 
     return spawn
