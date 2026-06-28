@@ -231,9 +231,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 4.2: Install-скрипты
-- [ ] `install.sh` / `install.ps1`: проверяют Docker (нет → ссылка на Docker Desktop), тянут/собирают образы, поднимают стек, открывают конфиг. Порог установки самого Docker — на пользователе.
-- [ ] Прогнать `bash -n install.sh` (синтаксис). `shellcheck` — если доступен.
-- [ ] Mark completed
+- [x] `install.sh` / `install.ps1`: проверяют Docker (нет → ссылка на Docker Desktop), тянут/собирают образы, поднимают стек, открывают конфиг. Порог установки самого Docker — на пользователе.
+- [x] Прогнать `bash -n install.sh` (синтаксис). `shellcheck` — если доступен. (bash -n зелёный; shellcheck недоступен в окружении — пропущен.)
+- [x] Mark completed
 
 ### Task 4.3: README + онбординг
 - [ ] Полный онбординг: Docker → конфиг (треки, резюме, шаблоны, карта, каналы, выхлоп, пороги) → движок (`cli`/`api_key`/`ollama`) → web-поиск → бот (BotFather) → приватные каналы (Telethon) → backfill → проверить xlsx → включить nightly (always-on). Раздел безопасности (риски).
