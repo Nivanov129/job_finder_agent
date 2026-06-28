@@ -121,3 +121,116 @@ def test_card_escapes_and_embeds() -> None:
 def test_components_escape_user_text() -> None:
     assert "<script>" not in chip("<script>")
     assert "&lt;script&gt;" in chip("<script>")
+
+
+# ── Экран 1 «Настройка» (Task 5.1) ────────────────────────────────
+
+
+def test_settings_screen_inventory(client: TestClient) -> None:
+    body = client.get("/").text
+    # шапка с ti-radar-2 и заголовок «Профиль» (без «под два пути»)
+    assert "ti-radar-2" in body
+    assert "Профиль" in body
+    assert "под два пути" not in body
+    assert "Скейлап" not in body and "AI-first" not in body  # нет хардкода путей
+    # always-on warning + повторяемая карточка + добавление направления
+    assert "always-on" in body
+    assert 'id="tracks-list"' in body
+    assert 'id="add-track"' in body
+    assert 'id="track-template"' in body
+    # движок AI: три карточки, CLI дефолт с бейджем
+    for value in ('value="cli"', 'value="api_key"', 'value="ollama"'):
+        assert value in body
+    assert "дефолт" in body
+    # выхлоп: чипы и слайдер порога с живым %
+    assert 'name="out_table"' in body and 'name="out_bot"' in body
+    assert 'name="cover_threshold"' in body
+    assert "70%" in body
+    # низ: сохранить + запустить backfill
+    assert 'value="save"' in body and 'value="backfill"' in body
+    # скрипт интерактивности грузится локально
+    assert "/static/js/settings.js" in body
+
+
+def test_settings_default_engine_is_cli(client: TestClient) -> None:
+    body = client.get("/").text
+    # дефолтный движок отмечен checked именно на CLI
+    cli = body.split('value="cli"', 1)[1][:40]
+    assert "checked" in cli
+
+
+def _single_track_form() -> dict[str, str]:
+    return {
+        "track_name": "Backend",
+        "track_resume": "./resumes/backend.pdf",
+        "track_template": "./cover-templates/default.md",
+        "track_rubric": "Сильная инженерная команда",
+        "track_roles": "Backend Engineer, Tech Lead",
+        "engine": "cli",
+        "cli_tool": "claude",
+        "out_table": "on",
+        "out_bot": "on",
+        "bot_token": "123:abc",
+        "cover_threshold": "75",
+        "use_aggregators": "on",
+        "search_map_path": "./search-map.md",
+        "web_search_url": "http://localhost:8080",
+        "action": "save",
+    }
+
+
+def test_save_single_track_writes_valid_config(tmp_path: Path) -> None:
+    from job_agent.config import load_config
+
+    cfg_path = tmp_path / "config.json"
+    client = TestClient(create_app(config_path=cfg_path))
+    r = client.post("/save", data=_single_track_form())
+    assert r.status_code == 200
+    assert "Конфиг сохранён" in r.text
+    assert cfg_path.exists()
+    cfg = load_config(cfg_path)  # валиден по схеме + pydantic
+    assert cfg.is_single_track
+    assert cfg.tracks[0].name == "Backend"
+    assert cfg.tracks[0].id == "backend"
+    assert cfg.tracks[0].role_gate == ["Backend Engineer", "Tech Lead"]
+    assert cfg.output_mode == "both"
+    assert cfg.cover_letter_threshold == 75
+    assert cfg.scoring_engine == "cli" and cfg.cli_tool == "claude"
+
+
+def test_save_three_tracks_writes_valid_config(tmp_path: Path) -> None:
+    from job_agent.config import load_config
+
+    cfg_path = tmp_path / "config.json"
+    client = TestClient(create_app(config_path=cfg_path))
+    # повторяющиеся поля — три направления (UI клонирует карточку)
+    data = {
+        "track_name": ["Backend", "Скейлап", "AI"],  # кириллица → id-фолбэк
+        "track_resume": ["./r/backend.pdf", "./r/scaleup.pdf", "./r/ai.pdf"],
+        "track_template": ["", "", ""],
+        "track_rubric": ["", "", ""],
+        "track_roles": ["", "", ""],
+        "engine": "ollama",
+        "ollama_model": "llama3.1:70b",
+        "out_table": "on",
+        "cover_threshold": "70",
+        "action": "backfill",
+    }
+    r = client.post("/save", data=data)
+    assert r.status_code == 200
+    cfg = load_config(cfg_path)
+    assert len(cfg.tracks) == 3
+    ids = [t.id for t in cfg.tracks]
+    assert ids == ["backend", "track-2", "ai"]  # кириллица схлопывается в фолбэк
+    assert cfg.output_mode == "table"
+    assert cfg.scoring_engine == "ollama" and cfg.ollama_model == "llama3.1:70b"
+
+
+def test_save_invalid_config_rejected_keeps_no_file(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.json"
+    client = TestClient(create_app(config_path=cfg_path))
+    # пустая форма: нет ни одного трека → невалидно (minItems: 1)
+    r = client.post("/save", data={"engine": "cli", "out_table": "on"})
+    assert r.status_code == 400
+    assert "не сохранён" in r.text
+    assert not cfg_path.exists()  # битый сабмит не создаёт файл

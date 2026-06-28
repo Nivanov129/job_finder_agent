@@ -111,3 +111,165 @@
   padding: 12px;
   font-size: 13px;
 }
+
+/* ── форма «Настройка» (Task 5.1) ─────────────────────────────── */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field__label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.input {
+  font: inherit;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--border-accent);
+}
+
+textarea.input {
+  resize: vertical;
+}
+
+/* повторяемая карточка направления — та же сетка auto-fit, что в прототипе */
+.tracks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.track-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.track-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* чип-переключатель (галка скрыта, состояние читается по .chip--on) */
+.chip-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.chip-toggle input {
+  margin: 0;
+}
+
+/* карточки выбора движка — выбранная получает рамку 2px --border-accent */
+.engine-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.engine-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-1);
+  cursor: pointer;
+}
+
+.engine-card input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.engine-grid:has(input:checked) .engine-card:has(input:checked),
+.engine-card:has(input:checked) {
+  border: 2px solid var(--border-accent);
+  background: var(--bg-accent);
+}
+
+.engine-card__title {
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.engine-card__meta {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.badge-default {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bg-accent);
+  color: var(--text-accent);
+}
+
+.engine-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.slider {
+  width: 100%;
+  accent-color: var(--fill-accent);
+}
+
+/* кнопки */
+.btn {
+  font: inherit;
+  padding: 8px 16px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.btn--accent {
+  border-color: var(--border-accent);
+  background: var(--fill-accent);
+  color: var(--on-accent);
+}
+
+.btn--ghost {
+  align-self: flex-start;
+  background: transparent;
+  color: var(--text-accent);
+  border-style: dashed;
+}
+
+.btn-icon {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.form-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}

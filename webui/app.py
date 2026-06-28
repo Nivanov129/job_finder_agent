@@ -1,20 +1,27 @@
-"""FastAPI-приложение web-UI (дизайн-каркас, Task 5.0).
+"""FastAPI-приложение web-UI.
 
-Отдаёт статику локально (`/static`) и базовую страницу-каркас, демонстрирующую
-токены и общие компоненты. Экраны «Настройка» (Task 5.1) и «Подборка» (Task 5.2)
-строятся поверх этого каркаса. Никаких внешних обращений: webfont Tabler вшит в
-`static/fonts/`, стили — локальные, CDN не используется.
+Экран 1 «Настройка» (Task 5.1) — единственный прокручиваемый столбец max-width
+720px поверх дизайн-каркаса (Task 5.0): шапка, warning про always-on, карта
+«Профиль» с повторяемой карточкой направления (заменяет две фиксированные
+колонки прототипа), общий блок «Карта поиска», «Источники», «Движок AI»,
+«Выхлоп». Сабмит пишет `config.json`, валидный по `config.schema.json`.
+
+Никаких внешних обращений: webfont Tabler вшит в `static/fonts/`, стили и
+скрипты — локальные, CDN не используется.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from webui.components import badge, card, chip, icon
+from job_agent.config import ConfigError, load_config
+from webui.components import chip, icon
+from webui.forms import config_from_form
+from webui.render import render_settings, save_result_page
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -22,60 +29,73 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 _HEAD = """\
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Job agent</title>
+<title>Job agent · настройка</title>
 <link rel="stylesheet" href="/static/css/tabler-icons.css">
 <link rel="stylesheet" href="/static/css/tokens.css">
 <link rel="stylesheet" href="/static/css/components.css">
 """
 
+#: Куда писать конфиг по умолчанию: корень репо (рядом с config.schema.json).
+_DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.json"
 
-def _page(title: str, body: str) -> str:
+
+def page(body: str, *, scripts: str = "") -> str:
     """Обёртка страницы: единственный столбец max-width 720px."""
     return (
         "<!doctype html><html lang=ru><head>"
-        f"{_HEAD}</head><body><main class=col>{body}</main></body></html>"
+        f"{_HEAD}</head><body><main class=col>{body}</main>{scripts}</body></html>"
     )
 
 
-def _scaffold_body() -> str:
-    """Демонстрация каркаса: шапка, warning-плашка, карточка с компонентами."""
-    header = (
-        '<div class="app-header">'
-        f'<span class="app-header__icon">{icon("ti-radar-2")}</span>'
-        "<div><div class=\"card__title\">Job agent · каркас</div>"
-        '<div class="card__meta">локально на вашем компьютере</div></div>'
-        "</div>"
-    )
-    warning = (
-        '<div class="notice-warning">'
-        f"{icon('ti-alert-triangle')} Ночной мониторинг требует включённого хоста (always-on)."
-        "</div>"
-    )
-    demo = card(
-        title="Демонстрация компонентов",
-        meta="бейдж · чип · карточка — из общего слоя",
-        right=badge(86),
-        body=(
-            f'<div style="display:flex;gap:8px;flex-wrap:wrap">'
-            f'{chip("vseti.app", on=True, icon_name="ti-rss")}'
-            f'{chip("getmatch")}'
-            f'{chip("Таблица .xlsx", icon_name="ti-arrow-bar-to-down")}'
-            f"</div>"
-        ),
-    )
-    return header + warning + demo
+def create_app(config_path: Path | str | None = None) -> FastAPI:
+    """Собрать FastAPI-приложение web-UI.
 
-
-def create_app() -> FastAPI:
-    """Собрать FastAPI-приложение каркаса."""
+    `config_path` — куда писать `config.json` при сохранении формы (по умолчанию
+    корень репо; в тестах подменяется на tmp).
+    """
     app = FastAPI(title="Job agent web-UI")
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    target = Path(config_path) if config_path is not None else _DEFAULT_CONFIG_PATH
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
-        return _page("Job agent", _scaffold_body())
+        return page(render_settings(), scripts='<script src="/static/js/settings.js"></script>')
+
+    @app.post("/save", response_class=HTMLResponse)
+    async def save(request: Request) -> HTMLResponse:
+        form = await request.form()
+        data = config_from_form(form)
+        try:
+            written = _write_and_validate(data, target)
+        except ConfigError as exc:
+            return HTMLResponse(page(save_result_page(ok=False, message=str(exc))), status_code=400)
+        action = str(form.get("action", "save"))
+        return HTMLResponse(page(save_result_page(ok=True, action=action, path=str(written))))
 
     return app
 
+
+def _write_and_validate(data: dict, target: Path) -> Path:
+    """Записать конфиг и проверить, что он грузится валидным по схеме.
+
+    Пишем во временный файл рядом с целью, валидируем, затем атомарно подменяем —
+    битый сабмит не затирает рабочий `config.json`.
+    """
+    import json
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_suffix(target.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        load_config(tmp)  # бросит ConfigError, если невалидно
+    except ConfigError:
+        tmp.unlink(missing_ok=True)
+        raise
+    tmp.replace(target)
+    return target
+
+
+# Экспортируемые для каркаса/тестов примитивы (совместимость с Task 5.0).
+__all__ = ["create_app", "app", "page", "chip", "icon"]
 
 app = create_app()
