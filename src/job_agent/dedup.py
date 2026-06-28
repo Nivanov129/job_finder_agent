@@ -14,6 +14,7 @@ import hashlib
 import os
 import re
 import sqlite3
+from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
 
@@ -23,6 +24,7 @@ __all__ = ["SeenStore", "content_key", "DEFAULT_DB_PATH", "ENV_DB_PATH"]
 
 ENV_DB_PATH = "JOB_AGENT_SEEN_DB"
 DEFAULT_DB_PATH = "job_agent_seen.db"
+_WATERMARK_KEY = "last_run"
 
 _WS = re.compile(r"\s+")
 
@@ -66,6 +68,10 @@ class SeenStore:
             );
             CREATE TABLE IF NOT EXISTS seen_url (
                 url TEXT PRIMARY KEY
+            );
+            CREATE TABLE IF NOT EXISTS meta (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
             );
             """
         )
@@ -112,6 +118,33 @@ class SeenStore:
             self.mark_seen(vacancy)
             out.append(vacancy)
         return out
+
+    def get_watermark(self) -> datetime | None:
+        """Метка времени последнего успешного прогона (None, если прогонов не было).
+
+        Используется nightly-режимом как нижняя граница `since`: берём только
+        посты новее прошлого прогона. Хранится в ISO-8601 (UTC, aware).
+        """
+        cur = self._conn.execute(
+            "SELECT value FROM meta WHERE key = ? LIMIT 1", (_WATERMARK_KEY,)
+        )
+        row = cur.fetchone()
+        if row is None:
+            return None
+        dt = datetime.fromisoformat(row[0])
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return dt
+
+    def set_watermark(self, moment: datetime) -> None:
+        """Запомнить метку времени прогона (идемпотентная перезапись)."""
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=UTC)
+        self._conn.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+            (_WATERMARK_KEY, moment.isoformat()),
+        )
+        self._conn.commit()
 
     def close(self) -> None:
         self._conn.close()

@@ -42,6 +42,7 @@ __all__ = [
     "map_examples",
     "run_pipeline",
     "run_backfill",
+    "run_nightly",
 ]
 
 logger = logging.getLogger("job_agent.pipeline")
@@ -248,3 +249,44 @@ def run_backfill(
     days = days if days is not None else config.backfill_days
     since = datetime.now(UTC) - timedelta(days=days)
     return run_pipeline(config, since=since, output_path=output_path, **kwargs)
+
+
+def run_nightly(
+    config: Config,
+    *,
+    now: datetime | None = None,
+    lookback_days: int | None = None,
+    output_path: str | Path | None = None,
+    seen_store: SeenStore | None = None,
+    **kwargs,
+) -> RunResult:
+    """Инкрементальный (nightly) прогон: только новое с прошлого прогона.
+
+    Водяной знак — метка времени последнего прогона в seen-store. Берём её как
+    нижнюю границу `since`; на первом прогоне (метки нет) откатываемся на
+    `lookback_days` (дефолт — `config.backfill_days`), чтобы засеять историю.
+    После прогона сдвигаем водяной знак на момент старта. Seen-store служит
+    backstop'ом дедупа: повторный прогон на тех же данных даёт ноль новых.
+    """
+    moment = now if now is not None else datetime.now(UTC)
+    own_store = seen_store is None
+    store = seen_store or SeenStore()
+    try:
+        watermark = store.get_watermark()
+        if watermark is not None:
+            since = watermark
+        else:
+            days = lookback_days if lookback_days is not None else config.backfill_days
+            since = moment - timedelta(days=days)
+        result = run_pipeline(
+            config,
+            since=since,
+            output_path=output_path,
+            seen_store=store,
+            **kwargs,
+        )
+        store.set_watermark(moment)
+        return result
+    finally:
+        if own_store:
+            store.close()

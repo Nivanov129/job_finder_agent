@@ -21,7 +21,7 @@ from job_agent.embeddings import Embedder
 from job_agent.engines.base import Engine
 from job_agent.models import RawPost
 from job_agent.output.xlsx import COLUMNS
-from job_agent.pipeline import build_collectors, run_backfill, run_pipeline
+from job_agent.pipeline import build_collectors, run_backfill, run_nightly, run_pipeline
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FAR_PAST = datetime(2000, 1, 1, tzinfo=UTC)
@@ -230,6 +230,92 @@ def test_logs_stage_counters(tmp_path, caplog) -> None:
             seen_store=SeenStore(":memory:"),
         )
     assert any("собрано" in r.message and "после фильтра" in r.message for r in caplog.records)
+
+
+class DateRecordingCollector:
+    """Стаб-коллектор: фильтрует посты по `since` и запоминает запрошенную границу."""
+
+    def __init__(self, posts):
+        self._posts = posts  # list[(date, RawPost)]
+        self.since_seen: list[datetime] = []
+
+    def fetch(self, since: datetime):
+        self.since_seen.append(since)
+        return [post for date, post in self._posts if date >= since]
+
+
+def test_nightly_seeds_then_uses_watermark(tmp_path) -> None:
+    """Первый nightly засевает по lookback; второй берёт водяной знак как `since`."""
+    config = _config(tmp_path, single_track=True)
+    db = tmp_path / "seen.db"
+    t0 = datetime(2026, 6, 1, tzinfo=UTC)
+    posts = [(t0, RawPost(raw_text="вакансия", source="stub", url="u1"))]
+
+    # Первый прогон: метки нет → since = now - lookback, попадает в окно.
+    first_collector = DateRecordingCollector(posts)
+    with SeenStore(db) as store:
+        first = run_nightly(
+            config,
+            now=datetime(2026, 6, 10, tzinfo=UTC),
+            lookback_days=14,
+            base_dir=tmp_path,
+            engine=StubEngine(config.tracks[0].name),
+            embedder=_embedder(),
+            collectors=[first_collector],
+            seen_store=store,
+        )
+        assert store.get_watermark() == datetime(2026, 6, 10, tzinfo=UTC)
+
+    assert first.collected == 1
+    assert first.written == 1
+    # since на первом прогоне отсчитан от lookback, не от эпохи.
+    assert first_collector.since_seen == [datetime(2026, 5, 27, tzinfo=UTC)]
+
+    # Второй прогон: водяной знак (2026-06-10) → старый пост вне окна → ноль новых.
+    second_collector = DateRecordingCollector(posts)
+    with SeenStore(db) as store:
+        second = run_nightly(
+            config,
+            now=datetime(2026, 6, 11, tzinfo=UTC),
+            base_dir=tmp_path,
+            engine=StubEngine(config.tracks[0].name),
+            embedder=_embedder(),
+            collectors=[second_collector],
+            seen_store=store,
+        )
+    assert second_collector.since_seen == [datetime(2026, 6, 10, tzinfo=UTC)]
+    assert second.collected == 0
+    assert second.written == 0
+
+
+def test_nightly_second_run_same_data_zero_new(tmp_path) -> None:
+    """Даже если пост снова попадает в окно, seen-store держит ноль новых."""
+    config = _config(tmp_path, single_track=True)
+    db = tmp_path / "seen.db"
+    # Пост датирован FAR_PAST? нет — коллектор игнорирует since, всегда отдаёт пост.
+
+    class AlwaysCollector:
+        def fetch(self, since: datetime):
+            return [RawPost(raw_text="вакансия", source="stub", url="u1")]
+
+    def _run(now: datetime) -> int:
+        with SeenStore(db) as store:
+            res = run_nightly(
+                config,
+                now=now,
+                lookback_days=14,
+                base_dir=tmp_path,
+                engine=StubEngine(config.tracks[0].name),
+                embedder=_embedder(),
+                collectors=[AlwaysCollector()],
+                seen_store=store,
+            )
+        return res.written
+
+    first = _run(datetime(2026, 6, 10, tzinfo=UTC))
+    second = _run(datetime(2026, 6, 11, tzinfo=UTC))
+    assert first == 1
+    assert second == 0
 
 
 def test_run_backfill_collects_recent(tmp_path) -> None:

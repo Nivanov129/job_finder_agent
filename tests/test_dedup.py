@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 from job_agent.dedup import SeenStore, content_key
@@ -83,6 +84,25 @@ def test_env_db_path(tmp_path: Path, monkeypatch) -> None:
         assert store.path == str(db)
         store.mark_seen(_vac("Env"))
     assert db.exists()
+
+
+def test_watermark_absent_then_set_and_persisted(tmp_path: Path) -> None:
+    db = tmp_path / "wm.db"
+    moment = datetime(2026, 6, 10, 3, 0, tzinfo=UTC)
+    with SeenStore(db) as store:
+        assert store.get_watermark() is None  # прогонов ещё не было
+        store.set_watermark(moment)
+        assert store.get_watermark() == moment
+    # переживает переоткрытие
+    with SeenStore(db) as store2:
+        assert store2.get_watermark() == moment
+
+
+def test_watermark_naive_treated_as_utc() -> None:
+    with SeenStore(":memory:") as store:
+        store.set_watermark(datetime(2026, 1, 1, 12, 0))  # naive
+        wm = store.get_watermark()
+        assert wm == datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
 
 
 def test_no_url_dedup_only_by_content() -> None:
