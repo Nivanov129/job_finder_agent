@@ -129,11 +129,21 @@ def test_engine_statuses_threads_ollama_key() -> None:
 
     states = engine_statuses(
         env={"OLLAMA_API_KEY": "sk"}, ollama_url="",
-        which=_which({"claude", "codex"}), run=_run_ok,
+        which=_which({"codex"}), run=_run_ok,
         http_get=http_get,
     )
-    assert [s.key for s in states] == ["claude", "codex", "ollama"]
+    assert [s.key for s in states] == ["codex", "ollama"]
     assert seen["headers"]["authorization"] == "Bearer sk"
+
+
+def test_recommend_first_prioritizes_task_models() -> None:
+    from webui.engine_status import recommend_first
+
+    out = recommend_first(["tinyllama:1b", "gpt-oss:120b", "deepseek-v3.1:671b"])
+    # подходящие под задачу (gpt-oss, deepseek) — впереди прочего
+    assert out[0] == "gpt-oss:120b"
+    assert out[1] == "deepseek-v3.1:671b"
+    assert out[-1] == "tinyllama:1b"
 
 
 def test_parse_and_merge_env(tmp_path: Path) -> None:

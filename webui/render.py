@@ -255,12 +255,6 @@ def _copy_cmd(cmd: str) -> str:
     )
 
 
-def _login_steps(steps: list[str]) -> str:
-    """Нумерованный гайд входа (шаги уже содержат готовый HTML)."""
-    items = "".join(f"<li>{s}</li>" for s in steps)
-    return f'<ol class="auth-steps">{items}</ol>'
-
-
 def _login_widget(engine: str) -> str:
     """Кнопка «Войти» + место для ссылки и формы кода (наполняет login.js)."""
     return (
@@ -273,7 +267,13 @@ def _login_widget(engine: str) -> str:
 
 
 def _auth_panel(
-    key: str, title: str, hint_html: str, fields_html: str, *, visible: bool = False
+    key: str,
+    title: str,
+    hint_html: str,
+    fields_html: str,
+    *,
+    visible: bool = False,
+    with_test: bool = True,
 ) -> str:
     """Панель авторизации движка: статус-пилюли (JS заполнит) + поля/подсказки.
 
@@ -282,16 +282,20 @@ def _auth_panel(
     для текущего движка, а не все сразу.
     """
     hidden = "" if visible else " hidden"
+    test = (
+        '<button type="button" class="btn engine-test" '
+        f'data-engine="{key}">{icon("ti-plug-connected")} Проверить</button>'
+        f'<span class="path-input__status" data-test="{key}"></span>'
+        if with_test
+        else ""
+    )
     return (
         f'<div class="auth-panel" data-engine="{key}"{hidden}>'
         f'<div class="auth-panel__head"><span class="auth-panel__title">{escape(title)}</span>'
         f'<span class="auth-panel__status" data-status="{key}">'
         f'{status_pill(ok=False, text="проверяю…", unknown=True)}</span></div>'
         f'<div class="auth-panel__hint">{hint_html}</div>'
-        f"{fields_html}"
-        '<button type="button" class="btn engine-test" '
-        f'data-engine="{key}">{icon("ti-plug-connected")} Проверить</button>'
-        '<span class="path-input__status" data-test="' + key + '"></span>'
+        f"{fields_html}{test}"
         "</div>"
     )
 
@@ -299,27 +303,26 @@ def _auth_panel(
 def render_engine(
     *,
     scoring_engine: str = "cli",
-    cli_tool: str = "claude",
-    ollama_url: str = "",
+    cli_tool: str = "codex",
     ollama_model: str = "",
     web_search_url: str = "",
     has_ollama_key: bool = False,
 ) -> str:
     """Экран «AI · авторизация»: выбор движка, статус, авторизация, web-поиск.
 
-    Текущие значения берутся из конфига; статусы установлен/авторизован
-    заполняет JS из `/engine/status`. Секреты в значения полей не подставляются —
-    только пометка «уже задан», чтобы не светить токены в HTML.
+    Два движка: Codex (вход через ChatGPT) и Ollama Cloud (ключ + модель).
+    Видна панель только выбранного движка; статусы заполняет JS из `/engine/status`.
+    Секреты в значения полей не подставляются — только пометка «уже задан».
     """
     active = (
         cli_tool if scoring_engine == "cli" else scoring_engine
-    )  # claude|codex|ollama
+    )  # codex|ollama
+    if active not in ("codex", "ollama"):
+        active = "codex"
 
     choices = (
-        _engine_choice("claude", "Claude Code", "claude -p · CLI", "подписка",
-                       active=active == "claude")
-        + _engine_choice("codex", "Codex", "codex exec · CLI", "подписка",
-                         active=active == "codex")
+        _engine_choice("codex", "Codex", "вход через ChatGPT", "подписка",
+                       active=active == "codex")
         + _engine_choice("ollama", "Ollama Cloud", "облачные модели", "нужен ключ",
                          active=active == "ollama")
     )
@@ -332,16 +335,6 @@ def render_engine(
             "</label>"
         )
 
-    claude_panel = _auth_panel(
-        "claude",
-        "Claude Code — нужна подписка Pro/Max",
-        "Вход в один клик: сервер запустит <code>claude setup-token</code>, покажет "
-        "ссылку для входа — вы авторизуетесь в браузере, вставите код, и токен "
-        "сохранится автоматически (живёт ~1 год)."
-        + _login_widget("claude"),
-        "",  # ручного поля токена нет — только вход через браузер
-        visible=active == "claude",
-    )
     codex_panel = _auth_panel(
         "codex",
         "Codex — вход через ChatGPT (без API-ключа)",
@@ -352,29 +345,27 @@ def render_engine(
         "",  # codex авторизуется по входу ChatGPT, поля ключа нет
         visible=active == "codex",
     )
+    # Текущая модель — первой опцией списка (JS дозаполнит реальными с сервера).
+    model_opts = (
+        f'<option value="{escape(ollama_model)}" selected>{escape(ollama_model)}</option>'
+        if ollama_model
+        else '<option value="" selected>— загрузите модели —</option>'
+    )
     ollama_panel = _auth_panel(
         "ollama",
-        "Ollama Cloud — облачные модели, нужен ключ",
-        _login_steps([
-            f"Создайте ключ на {_copy_cmd('ollama.com/settings/keys')} "
-            "и вставьте его в поле ниже (живёт в .env).",
-            "Выберите модель из списка (подтянется с сервера) или впишите вручную.",
-            f"Свой/локальный сервер? Укажите его URL "
-            f"({_copy_cmd('http://host.docker.internal:11434')}) — ключ не нужен.",
-        ]),
+        "Ollama Cloud — облачные модели",
+        "Ключ — на " + _copy_cmd("ollama.com/settings/keys") + ". Вставьте его, "
+        "нажмите «Загрузить модели» и выберите модель.",
         secret_field("ollama_key", "OLLAMA_API_KEY", "вставьте ключ облака",
                      has=has_ollama_key)
-        + '<label class="field"><span class="field__label">Модель</span>'
-        f'<input class="input" name="ollama_model" value="{escape(ollama_model)}" '
-        'placeholder="gpt-oss:120b" data-ollama-model-input></label>'
-        '<select class="input" data-ollama-model-select hidden '
-        'aria-label="выбрать модель с сервера">'
-        '<option value="">— модели сервера —</option></select>'
-        '<label class="field"><span class="field__label">URL своего сервера (опц.)</span>'
-        f'<input class="input" name="ollama_url" value="{escape(ollama_url)}" '
-        'placeholder="оставьте пустым для облака · http://host.docker.internal:11434">'
-        "</label>",
+        + '<button type="button" class="btn ollama-load">'
+        f'{icon("ti-refresh")} Загрузить модели</button>'
+        '<span class="path-input__status" data-ollama-load></span>'
+        '<label class="field"><span class="field__label">Модель</span>'
+        f'<select class="input" name="ollama_model" data-ollama-model-select>{model_opts}'
+        "</select></label>",
         visible=active == "ollama",
+        with_test=False,  # у Ollama своя кнопка «Загрузить модели» вместо «Проверить»
     )
     web = (
         '<section class="card">'
@@ -393,7 +384,7 @@ def render_engine(
         '<section class="card">'
         f'<div class="card__title">{icon("ti-cpu")} Движок AI</div>'
         f'<div class="engine-grid">{choices}</div>'
-        f"{claude_panel}{codex_panel}{ollama_panel}"
+        f"{codex_panel}{ollama_panel}"
         "</section>"
         + web
         + '<div class="form-footer">'

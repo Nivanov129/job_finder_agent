@@ -154,24 +154,21 @@ def engine_config_from_form(
     `cli_tool`; ollama → `scoring_engine=ollama`. Движок `api_key` со страницы
     убран (доступен только ручной правкой config.json).
     """
-    engine = _clean(form.get("engine", "")) or "claude"
+    engine = _clean(form.get("engine", "")) or "codex"
     config: dict[str, Any] = {}
     secrets: dict[str, str | None] = {}
 
     if engine in ("claude", "codex"):
-        # claude/codex авторизуются server-driven входом («Войти» → /engine/login),
-        # токен/сессия пишутся отдельно — здесь сохраняем только выбор движка.
+        # codex авторизуется server-driven входом («Войти» → /engine/login),
+        # сессия пишется отдельно — здесь сохраняем только выбор движка.
         config["scoring_engine"] = "cli"
         config["cli_tool"] = engine
     elif engine == "ollama":
         config["scoring_engine"] = "ollama"
         model = _clean(form.get("ollama_model", ""))
-        url = _clean(form.get("ollama_url", ""))
         key = _clean(form.get("ollama_key", ""))
         if model:
             config["ollama_model"] = model
-        if url:  # пусто → облако (https://ollama.com) по умолчанию
-            config["api_base_url"] = url
         if key:  # ключ Ollama Cloud — секрет, в .env, не в config.json
             secrets["OLLAMA_API_KEY"] = key
 

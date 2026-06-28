@@ -25,7 +25,7 @@ from starlette.concurrency import run_in_threadpool
 
 from job_agent.config import ConfigError, load_config
 from webui.components import chip, icon, nav
-from webui.engine_status import engine_statuses, ollama_models
+from webui.engine_status import engine_statuses, ollama_models, recommend_first
 from webui.env_store import merge_env, parse_env
 from webui.forms import config_from_form, engine_config_from_form
 from webui.login_flow import LoginManager, LoginSpawner, default_spawner
@@ -124,8 +124,7 @@ def create_app(
         return page(
             render_engine(
                 scoring_engine=se,
-                cli_tool=cfg.get("cli_tool", "claude"),
-                ollama_url=cfg.get("api_base_url", "") if se == "ollama" else "",
+                cli_tool=cfg.get("cli_tool", "codex"),
                 ollama_model=cfg.get("ollama_model", ""),
                 web_search_url=(cfg.get("web_search") or {}).get("url", ""),
                 has_ollama_key=bool(env.get("OLLAMA_API_KEY")),
@@ -134,15 +133,16 @@ def create_app(
             active="/engine",
         )
 
-    @app.get("/engine/ollama/models")
-    def engine_ollama_models(url: str = "") -> JSONResponse:
-        # Список моделей для выпадающего списка: облако (ключ из .env) или свой
-        # сервер по `url`. Недоступность → пустой список (JS оставит свободный ввод).
+    @app.post("/engine/ollama/models")
+    async def engine_ollama_models(request: Request) -> JSONResponse:
+        # Список моделей Ollama Cloud для дропдауна — рекомендованные под задачу
+        # первыми. Ключ берём из формы (вставленный, ещё не сохранённый) или из
+        # .env. Недоступность/неверный ключ → пустой список.
+        form = await request.form()
         env = {**os.environ, **parse_env(envfile)}
-        cfg = _load_raw(target)
-        saved = cfg.get("api_base_url", "") if cfg.get("scoring_engine") == "ollama" else ""
-        models = ollama_models(url or saved, api_key=env.get("OLLAMA_API_KEY"))
-        return JSONResponse({"models": models})
+        key = str(form.get("key", "")).strip() or env.get("OLLAMA_API_KEY")
+        models = await run_in_threadpool(ollama_models, "", api_key=key)
+        return JSONResponse({"models": recommend_first(models)})
 
     @app.get("/engine/status")
     def engine_status() -> JSONResponse:
@@ -202,7 +202,7 @@ def create_app(
                 "подхватит его после перезапуска стека: "
                 "<code>docker compose up -d</code>."
             )
-        verify_engine = str(form.get("engine", "")) or "claude"
+        verify_engine = str(form.get("engine", "")) or "codex"
         return HTMLResponse(
             page(
                 save_result_page(
@@ -246,7 +246,7 @@ def create_app(
             # Мерж: Настройка не несёт полей движка — берём их из текущего
             # конфига; при первом сохранении проставляем дефолтный движок.
             written = _merge_and_validate(
-                data, target, defaults={"scoring_engine": "cli", "cli_tool": "claude"}
+                data, target, defaults={"scoring_engine": "cli", "cli_tool": "codex"}
             )
         except ConfigError as exc:
             return HTMLResponse(

@@ -33,35 +33,44 @@
       .catch(function () {});
   }
 
-  // Подтянуть модели Ollama (облако/свой сервер) в выпадающий список. Свободный
-  // ввод остаётся рабочим: select лишь копирует выбор в текстовое поле, поэтому
-  // при недоступности сервера форма всё равно отправит введённую вручную модель.
+  // «Загрузить модели»: по вставленному ключу тянем список моделей Ollama Cloud
+  // (рекомендованные под задачу — первыми) и заполняем выпадающий список.
   function loadOllamaModels() {
     var sel = document.querySelector("[data-ollama-model-select]");
-    var input = document.querySelector("[data-ollama-model-input]");
-    if (!sel || !input) return;
-    var url = "/engine/ollama/models";
-    var srv = document.querySelector('[name="ollama_url"]');
-    if (srv && srv.value.trim()) url += "?url=" + encodeURIComponent(srv.value.trim());
-    fetch(url)
+    var keyEl = document.querySelector('[name="ollama_key"]');
+    var status = document.querySelector("[data-ollama-load]");
+    if (!sel) return;
+    var current = sel.value;
+    if (status) { status.textContent = "Загружаю…"; status.className = "path-input__status"; }
+    var fd = new FormData();
+    if (keyEl && keyEl.value.trim()) fd.append("key", keyEl.value.trim());
+    fetch("/engine/ollama/models", { method: "POST", body: fd })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var models = data.models || [];
-        if (!models.length) return; // сервер недоступен — оставляем свободный ввод
-        sel.innerHTML = '<option value="">— выберите модель —</option>';
+        if (!models.length) {
+          if (status) {
+            status.textContent = "✗ моделей нет — проверьте ключ";
+            status.className = "path-input__status is-error";
+          }
+          return;
+        }
+        sel.innerHTML = "";
         models.forEach(function (name) {
           var opt = document.createElement("option");
           opt.value = name;
           opt.textContent = name;
-          if (name === input.value) opt.selected = true;
+          if (name === current) opt.selected = true;
           sel.appendChild(opt);
         });
-        sel.hidden = false;
-        sel.addEventListener("change", function () {
-          if (sel.value) input.value = sel.value;
-        });
+        if (status) {
+          status.textContent = "✓ моделей: " + models.length;
+          status.className = "path-input__status is-ok";
+        }
       })
-      .catch(function () {});
+      .catch(function () {
+        if (status) { status.textContent = "✗ сеть"; status.className = "path-input__status is-error"; }
+      });
   }
 
   // Реальная мини-проба движка: пишет результат в `out` (✓/✗ + сообщение).
@@ -179,6 +188,8 @@
       setTimeout(function () { copyBtn.setAttribute("title", prev || "копировать"); }, 1500);
       return;
     }
+    // Ollama: загрузить список моделей по вставленному ключу.
+    if (ev.target.closest(".ollama-load")) { loadOllamaModels(); return; }
     // Server-driven вход: старт / завершение.
     var startBtn = ev.target.closest(".login-start");
     if (startBtn) { loginStart(startBtn.getAttribute("data-engine")); return; }
@@ -201,6 +212,5 @@
 
   togglePanels();
   loadStatus();
-  loadOllamaModels();
   autoVerify();
 })();

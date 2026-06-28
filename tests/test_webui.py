@@ -259,14 +259,14 @@ def test_upload_then_path_used_in_valid_config(tmp_path: Path) -> None:
     assert cfg.tracks[0].resume_path == "uploads/resumes/cv.pdf"
 
 
-def test_engine_page_default_is_claude(client: TestClient) -> None:
+def test_engine_page_default_is_codex(client: TestClient) -> None:
     body = client.get("/engine").text
-    # дефолтный движок на странице AI — Claude (checked)
-    claude = body.split('value="claude"', 1)[1][:40]
-    assert "checked" in claude
-    # три движка + пометки биллинга (подписка/нужен ключ); api_key со страницы убран
-    for value in ('value="claude"', 'value="codex"', 'value="ollama"'):
+    # два движка: codex (дефолт, checked) и ollama; claude/api_key убраны
+    codex = body.split('value="codex"', 1)[1][:40]
+    assert "checked" in codex
+    for value in ('value="codex"', 'value="ollama"'):
         assert value in body
+    assert 'value="claude"' not in body
     assert 'value="api_key"' not in body
     assert "подписка" in body and "нужен ключ" in body
     # статус подтягивается локальным engine.js, без CDN
@@ -309,7 +309,7 @@ def test_save_single_track_writes_valid_config(tmp_path: Path) -> None:
     assert cfg.tracks[0].role_gate == ["Backend Engineer", "Tech Lead"]
     assert cfg.output_mode == "both"
     assert cfg.cover_letter_threshold == 75
-    assert cfg.scoring_engine == "cli" and cfg.cli_tool == "claude"
+    assert cfg.scoring_engine == "cli" and cfg.cli_tool == "codex"
 
 
 def test_save_three_tracks_writes_valid_config(tmp_path: Path) -> None:
@@ -335,7 +335,7 @@ def test_save_three_tracks_writes_valid_config(tmp_path: Path) -> None:
     assert ids == ["backend", "track-2", "ai"]  # кириллица схлопывается в фолбэк
     assert cfg.output_mode == "table"
     # движок не задаётся на Настройке → дефолт cli/claude (правится на /engine)
-    assert cfg.scoring_engine == "cli" and cfg.cli_tool == "claude"
+    assert cfg.scoring_engine == "cli" and cfg.cli_tool == "codex"
 
 
 def _seed_config(client: TestClient) -> None:
@@ -363,20 +363,20 @@ def test_engine_save_codex_sets_cli_no_secret(tmp_path: Path) -> None:
 
 def test_engine_page_shows_only_selected_panel(client: TestClient) -> None:
     body = client.get("/engine").text
-    # дефолт — claude: его панель видима, остальные скрыты (hidden)
-    assert '<div class="auth-panel" data-engine="claude">' in body
-    assert '<div class="auth-panel" data-engine="codex" hidden>' in body
+    # дефолт — codex: его панель видима, ollama скрыта (hidden); claude убран
+    assert '<div class="auth-panel" data-engine="codex">' in body
     assert '<div class="auth-panel" data-engine="ollama" hidden>' in body
-    # у codex больше нет поля ключа OPENAI_API_KEY; у claude — ручного поля токена
+    assert 'data-engine="claude"' not in body
+    # codex без поля ключа; api_key/claude_token полей нет
     assert 'name="codex_key"' not in body
     assert 'name="claude_token"' not in body
 
 
-def test_engine_page_has_login_buttons(client: TestClient) -> None:
+def test_engine_page_has_login_button_codex(client: TestClient) -> None:
     body = client.get("/engine").text
-    # server-driven вход: кнопка «Войти» у claude и codex
-    assert 'class="btn btn--accent login-start" data-engine="claude"' in body
+    # server-driven вход остался только у codex
     assert 'class="btn btn--accent login-start" data-engine="codex"' in body
+    assert 'data-engine="claude"' not in body
 
 
 def _login_app(tmp_path: Path):
@@ -432,7 +432,7 @@ def test_login_start_unsupported_engine_400(tmp_path: Path) -> None:
     assert r.status_code == 400 and r.json()["ok"] is False
 
 
-def test_engine_save_ollama_uses_url_and_model(tmp_path: Path) -> None:
+def test_engine_save_ollama_model(tmp_path: Path) -> None:
     from job_agent.config import load_config
 
     cfg_path = tmp_path / "config.json"
@@ -440,17 +440,13 @@ def test_engine_save_ollama_uses_url_and_model(tmp_path: Path) -> None:
     _seed_config(client)
     r = client.post(
         "/engine/save",
-        data={
-            "engine": "ollama",
-            "ollama_url": "http://host.docker.internal:11434",
-            "ollama_model": "llama3.1:70b",
-        },
+        data={"engine": "ollama", "ollama_model": "gpt-oss:120b"},
     )
     assert r.status_code == 200
     cfg = load_config(cfg_path)
     assert cfg.scoring_engine == "ollama"
-    assert cfg.ollama_model == "llama3.1:70b"
-    assert cfg.api_base_url == "http://host.docker.internal:11434"
+    assert cfg.ollama_model == "gpt-oss:120b"
+    assert cfg.api_base_url is None  # только облако — своего URL нет
 
 
 def test_engine_save_ollama_cloud_key_to_env_not_config(tmp_path: Path) -> None:
@@ -474,20 +470,22 @@ def test_engine_save_ollama_cloud_key_to_env_not_config(tmp_path: Path) -> None:
     assert "sk-cloud" not in cfg_path.read_text(encoding="utf-8")
 
 
-def test_engine_page_ollama_has_copy_steps(client: TestClient) -> None:
+def test_engine_page_ollama_simplified(client: TestClient) -> None:
     body = client.get("/engine").text
-    # у Ollama остаётся гайд с кнопками «копировать команду»
-    assert 'class="auth-steps"' in body
+    # ключ + кнопка «Загрузить модели» + select моделей; без URL-поля своего сервера
     assert 'data-copy="ollama.com/settings/keys"' in body
+    assert 'class="btn ollama-load"' in body
+    assert 'name="ollama_model"' in body and "data-ollama-model-select" in body
+    assert 'name="ollama_url"' not in body
 
 
 def test_engine_save_triggers_autoverify(tmp_path: Path) -> None:
     client = TestClient(create_app(config_path=tmp_path / "config.json"))
     _seed_config(client)
-    r = client.post("/engine/save", data={"engine": "claude"})
+    r = client.post("/engine/save", data={"engine": "codex"})
     assert r.status_code == 200
     # страница-подтверждение сама гоняет «Проверить» для сохранённого движка
-    assert 'data-autoverify="claude"' in r.text
+    assert 'data-autoverify="codex"' in r.text
     assert "/static/js/engine.js" in r.text  # скрипт авто-проверки подключён
 
 
@@ -515,15 +513,21 @@ def test_engine_save_without_secret_no_restart_hint(tmp_path: Path) -> None:
     assert "docker compose up -d" not in r.text
 
 
-def test_engine_ollama_models_route(tmp_path: Path, monkeypatch) -> None:
+def test_engine_ollama_models_route_recommends_first(tmp_path: Path, monkeypatch) -> None:
     import webui.engine_status as es
 
-    monkeypatch.setattr(
-        es, "_default_http_get", lambda url, headers: {"models": [{"name": "gpt-oss:120b"}]}
-    )
+    captured: dict[str, dict] = {}
+
+    def fake_get(url, headers):
+        captured["headers"] = headers
+        return {"models": [{"name": "random-model:1b"}, {"name": "gpt-oss:120b"}]}
+
+    monkeypatch.setattr(es, "_default_http_get", fake_get)
     client = TestClient(create_app(config_path=tmp_path / "config.json"))
-    data = client.get("/engine/ollama/models").json()
-    assert data["models"] == ["gpt-oss:120b"]
+    # ключ передаётся в форме (ещё не сохранён) → уходит в Bearer
+    data = client.post("/engine/ollama/models", data={"key": "sk-x"}).json()
+    assert data["models"][0] == "gpt-oss:120b"  # рекомендованная — первой
+    assert captured["headers"]["authorization"] == "Bearer sk-x"
 
 
 def test_settings_save_preserves_engine_choice(tmp_path: Path) -> None:
@@ -543,7 +547,7 @@ def test_engine_status_route_lists_engines(tmp_path: Path) -> None:
     client = TestClient(create_app(config_path=tmp_path / "config.json"))
     data = client.get("/engine/status").json()
     keys = {e["key"] for e in data["engines"]}
-    assert keys == {"claude", "codex", "ollama"}
+    assert keys == {"codex", "ollama"}
     for e in data["engines"]:
         assert set(e) >= {"key", "label", "billing", "installed", "authorized", "detail"}
 

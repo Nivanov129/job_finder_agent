@@ -22,6 +22,7 @@ __all__ = [
     "codex_status",
     "ollama_status",
     "ollama_models",
+    "recommend_first",
     "CLOUD_BASE_URL",
 ]
 
@@ -111,6 +112,30 @@ def ollama_models(
     return [m.get("name", "") for m in (data.get("models") or []) if m.get("name")]
 
 
+# Семейства моделей, хорошо подходящих под нашу задачу (скоринг: рассуждение,
+# многоязычность вкл. русский, строгий JSON). Имена не выдумываем — фильтруем
+# реальный список с сервера, поднимая подходящие наверх.
+RECOMMENDED_FAMILIES: tuple[str, ...] = (
+    "gpt-oss", "deepseek", "qwen3", "qwen2.5", "glm", "kimi", "llama3", "llama4",
+    "mistral", "gemma", "command",
+)
+
+
+def recommend_first(models: list[str]) -> list[str]:
+    """Поднять подходящие под задачу модели наверх (порядок семейств — приоритет).
+
+    Возвращает рекомендованные (в порядке `RECOMMENDED_FAMILIES`) + остальные.
+    """
+    def rank(name: str) -> int:
+        low = name.lower()
+        for i, fam in enumerate(RECOMMENDED_FAMILIES):
+            if fam in low:
+                return i
+        return len(RECOMMENDED_FAMILIES)
+
+    return sorted(models, key=lambda m: (rank(m), m))
+
+
 def ollama_status(
     url: str = "", *, api_key: str | None = None, http_get: HttpGetFn
 ) -> EngineStatus:
@@ -148,7 +173,6 @@ def engine_statuses(
     run = run or _default_run
     http_get = http_get or _default_http_get
     return [
-        claude_status(which=which, run=run, env=env),
         codex_status(which=which, run=run, env=env),
         ollama_status(ollama_url, api_key=env.get("OLLAMA_API_KEY"), http_get=http_get),
     ]
