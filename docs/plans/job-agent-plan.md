@@ -135,9 +135,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 1.3: TG приватный (Telethon, опц.)
-- [ ] `collectors/telegram_private.py`: за интерфейсом, активен только при `telethon_creds`, сетевой код за фасадом.
-- [ ] Тест на фейке клиента.
-- [ ] Mark completed
+- [x] `collectors/telegram_private.py`: за интерфейсом, активен только при `telethon_creds`, сетевой код за фасадом.
+- [x] Тест на фейке клиента.
+- [x] Mark completed
 
 ### Task 1.4: Интерфейс AI-движка + фейк
 - [ ] `engines/base.py` (`Engine.complete(prompt, *, web_search=False)->str`), `engines/__init__.py` фабрика по `scoring_engine`, фейковый движок для тестов.
