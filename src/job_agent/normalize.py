@@ -10,10 +10,14 @@ markdown-обёртка, не-вакансия → пустой список, а
 from __future__ import annotations
 
 import json
+import logging
+from collections.abc import Callable
 from pathlib import Path
 
 from .engines.base import Engine
 from .models import RawPost, Vacancy
+
+logger = logging.getLogger("job_agent.normalize")
 
 __all__ = ["normalize_post", "normalize_posts", "parse_vacancies", "render_prompt"]
 
@@ -114,11 +118,44 @@ def normalize_post(
     return parse_vacancies(response, post)
 
 
+def _safe_normalize(post: RawPost, engine: Engine, output_lang: str) -> list[Vacancy]:
+    """Нормализация одного поста с изоляцией: сбой (сеть/движок/мусор) → пусто."""
+    try:
+        return normalize_post(post, engine, output_lang=output_lang)
+    except Exception as exc:
+        logger.warning("нормализация поста пропущена: %s", str(exc)[:160])
+        return []
+
+
 def normalize_posts(
-    posts: list[RawPost], engine: Engine, *, output_lang: str = "ru"
+    posts: list[RawPost],
+    engine: Engine,
+    *,
+    output_lang: str = "ru",
+    workers: int = 1,
+    on_each: Callable[[], None] | None = None,
 ) -> list[Vacancy]:
-    """Нормализовать набор постов; вакансии всех постов в одном списке."""
+    """Нормализовать набор постов; вакансии всех постов в одном списке.
+
+    `workers > 1` — параллельные AI-вызовы (порядок сохраняется). Каждый пост
+    изолирован: его сбой не валит остальные. `on_each` зовётся по завершении
+    каждого поста (для прогресса).
+    """
+    def run(post: RawPost) -> list[Vacancy]:
+        result = _safe_normalize(post, engine, output_lang)
+        if on_each is not None:
+            on_each()
+        return result
+
     out: list[Vacancy] = []
-    for post in posts:
-        out.extend(normalize_post(post, engine, output_lang=output_lang))
+    if workers <= 1 or len(posts) <= 1:
+        for post in posts:
+            out.extend(run(post))
+        return out
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=min(workers, len(posts))) as ex:
+        for vacs in ex.map(run, posts):  # map сохраняет порядок входа
+            out.extend(vacs)
     return out

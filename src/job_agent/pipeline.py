@@ -40,6 +40,7 @@ from .normalize import normalize_posts
 from .output.xlsx import write_xlsx
 from .prefilter import DEFAULT_LIMIT, DEFAULT_MIN_SIM, MapExample, prefilter_and_route
 from .scoring import score_routed
+from .titlefilter import derive_titles, filter_posts_by_titles
 from .websearch import make_searcher
 from .websearch.base import Searcher
 
@@ -179,6 +180,29 @@ def build_collectors(
     return collectors
 
 
+def _derive_all_titles(engine: Engine, track_resumes: dict[str, str]) -> list[str]:
+    """Названия должностей из всех резюме треков (по уникальному резюме), без дублей."""
+    titles: list[str] = []
+    seen_resumes: set[str] = set()
+    for resume in track_resumes.values():
+        key = resume.strip()[:200]
+        if not key or key in seen_resumes:
+            continue
+        seen_resumes.add(key)
+        try:
+            titles.extend(derive_titles(engine, resume))
+        except Exception as exc:
+            logger.warning("вывод названий должности пропущен: %s", str(exc)[:120])
+    out: list[str] = []
+    seen: set[str] = set()
+    for t in titles:
+        k = t.lower()
+        if k not in seen:
+            seen.add(k)
+            out.append(t)
+    return out
+
+
 def _dedupe_raw_posts(posts: list[RawPost]) -> list[RawPost]:
     """Убрать точные повторы постов по нормализованному тексту (первый — остаётся)."""
     seen: set[str] = set()
@@ -250,16 +274,43 @@ def run_pipeline(
         posts = _dedupe_raw_posts(posts)
         if len(posts) < collected:
             logger.info("повторы постов убраны: %d → %d", collected, len(posts))
-        _report("normalize", collected=collected)
 
-        # 2. Нормализация.
-        vacancies = normalize_posts(posts, engine, output_lang=config.output_lang)
+        # Резюме треков нужны и для грубого фильтра, и для пре-фильтра — грузим раз.
+        track_resumes = load_track_resumes(config, base)
+
+        # 1.5 Грубый фильтр по названию должности (из резюме) ДО нормализации:
+        # отсекаем заведомо нерелевантные посты, чтобы не гонять дорогой AI зря.
+        if config.title_prefilter and posts:
+            titles = _derive_all_titles(engine, track_resumes)
+            if titles:
+                before = len(posts)
+                posts = filter_posts_by_titles(posts, titles)
+                logger.info("фильтр по названию: %d → %d", before, len(posts))
+        to_normalize = len(posts)
+        _report("normalize", collected=collected, to_normalize=to_normalize)
+
+        # 2. Нормализация (параллельно, изоляция по посту).
+        done = {"n": 0}
+
+        def _tick() -> None:
+            done["n"] += 1
+            _report(
+                "normalize", collected=collected,
+                to_normalize=to_normalize, normalized=done["n"],
+            )
+
+        vacancies = normalize_posts(
+            posts,
+            engine,
+            output_lang=config.output_lang,
+            workers=config.parallelism,
+            on_each=_tick,
+        )
 
         # 3. Дедуп (кросс-источник + внутрипрогонный), помечаем виденными.
         fresh = store.filter_new(vacancies)
 
         # 4. Пре-фильтр + роутинг.
-        track_resumes = load_track_resumes(config, base)
         examples = map_examples(config, base)
         routed = prefilter_and_route(
             fresh,
@@ -287,8 +338,9 @@ def run_pipeline(
         if config.enable_contacts and contact_searcher is None:
             contact_searcher = make_searcher(config)
 
-        results: list[EnrichedResult] = []
-        for rv in routed:
+        scored = {"n": 0}
+
+        def _score_one(rv) -> EnrichedResult | None:
             score = score_routed(
                 rv,
                 tracks_by_id,
@@ -300,10 +352,8 @@ def run_pipeline(
                 output_lang=config.output_lang,
             )
             if score is None:
-                continue
-
-            # 6. Обогащение финалистов: сопроводительное (гейт по порогу + шаблон)
-            #    и опц. контакт-ассист (только при enable_contacts).
+                return None
+            # 6. Обогащение: сопроводительное (гейт по порогу+шаблон) + опц. контакты.
             track = tracks_by_name.get(score.track) or tracks_by_id.get(rv.best_track)
             track_id = track.id if track is not None else rv.best_track
             cover_letter = write_cover_letter(
@@ -325,15 +375,31 @@ def run_pipeline(
                     enable_contacts=True,
                     output_lang=config.output_lang,
                 )
-
-            results.append(
-                EnrichedResult(
-                    vacancy=rv.vacancy,
-                    score=score,
-                    cover_letter=cover_letter,
-                    contacts=contacts,
-                )
+            return EnrichedResult(
+                vacancy=rv.vacancy, score=score, cover_letter=cover_letter,
+                contacts=contacts,
             )
+
+        def _run_score(rv) -> EnrichedResult | None:
+            # Изоляция: сбой по одному финалисту не валит остальной скоринг.
+            try:
+                result = _score_one(rv)
+            except Exception as exc:
+                logger.warning("скоринг финалиста пропущен: %s", str(exc)[:160])
+                result = None
+            scored["n"] += 1
+            _report("score", collected=collected, after_filter=after_filter,
+                    scored=scored["n"])
+            return result
+
+        # Скоринг параллельно (ex.map сохраняет порядок); финалистов немного.
+        if config.parallelism > 1 and len(routed) > 1:
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=min(config.parallelism, len(routed))) as ex:
+                results = [r for r in ex.map(_run_score, routed) if r is not None]
+        else:
+            results = [r for r in (_run_score(rv) for rv in routed) if r is not None]
 
         # 7. Выход (.xlsx).
         out_path: Path | None = None

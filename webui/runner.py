@@ -24,7 +24,10 @@ class RunState:
     message: str = ""
     stage: str = ""  # collect | normalize | score (живой этап)
     collected: int = 0
+    to_normalize: int = 0  # сколько постов идёт в нормализацию (после фильтра)
+    normalized: int = 0  # сколько уже нормализовано
     after_filter: int = 0
+    scored: int = 0  # сколько финалистов уже оценено
     written: int = 0
     output: str = ""  # имя файла .xlsx для скачивания (когда готово)
 
@@ -66,10 +69,9 @@ class BackfillRunner:
             if self._state.status != "running":
                 return
             self._state.stage = stage
-            if "collected" in counts:
-                self._state.collected = counts["collected"]
-            if "after_filter" in counts:
-                self._state.after_filter = counts["after_filter"]
+            for key in ("collected", "to_normalize", "normalized", "after_filter", "scored"):
+                if key in counts:
+                    setattr(self._state, key, counts[key])
 
     def _worker(self, config_path: Path) -> None:
         try:

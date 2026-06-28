@@ -123,6 +123,8 @@ def _config(tmp_path: Path, *, single_track: bool) -> Config:
         "output_mode": "table",
         "tg_channels": [{"handle": "forhirejobs", "private": False}],
         "use_aggregators": True,
+        "parallelism": 1,
+        "title_prefilter": False,
     }
     return Config.model_validate(data)
 
@@ -460,6 +462,8 @@ def _enrich_config(tmp_path: Path) -> Config:
         "use_aggregators": True,
         "cover_letter_threshold": 70,
         "enable_contacts": True,
+        "parallelism": 1,
+        "title_prefilter": False,
     }
     return Config.model_validate(data)
 

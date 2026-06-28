@@ -158,6 +158,18 @@
       "type": "boolean",
       "default": false,
       "description": "Контакт-ассист: найти контакт + черновик обращения. Отправки нет."
+    },
+    "parallelism": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16,
+      "default": 4,
+      "description": "Сколько AI-вызовов (нормализация/скоринг) гнать параллельно."
+    },
+    "title_prefilter": {
+      "type": "boolean",
+      "default": true,
+      "description": "Грубо отсеивать посты по названию должности (из резюме) ДО нормализации."
     }
   },
 

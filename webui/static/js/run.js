@@ -7,11 +7,19 @@
   function render(s) {
     if (s.status === "running") {
       box.className = "run-status";
-      var stages = { collect: "собираю вакансии", normalize: "нормализую (AI)", score: "скоринг (AI)" };
-      var label = stages[s.stage] || "идёт";
-      var nums = s.collected ? (" · собрано " + s.collected +
-        (s.after_filter ? " · финалистов " + s.after_filter : "")) : "";
-      box.innerHTML = '<i class="ti ti-loader"></i> Прогон: ' + label + "…" + nums;
+      var label, detail = "";
+      if (s.stage === "normalize") {
+        label = "нормализую (AI)";
+        detail = " " + (s.normalized || 0) + " / " + (s.to_normalize || "?") +
+          (s.collected ? "  · собрано " + s.collected : "");
+      } else if (s.stage === "score") {
+        label = "скоринг (AI)";
+        detail = " " + (s.scored || 0) + " / " + (s.after_filter || "?");
+      } else {
+        label = "собираю вакансии";
+        detail = s.collected ? " собрано " + s.collected : "";
+      }
+      box.innerHTML = '<i class="ti ti-loader"></i> Прогон: ' + label + "…" + detail;
     } else if (s.status === "done") {
       box.className = "run-status is-ok";
       var dl = s.output
