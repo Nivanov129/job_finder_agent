@@ -70,6 +70,31 @@ services:
       - seen_store:/var/lib/job-agent
     restart: unless-stopped
 
+  # Web-UI (экраны «Настройка»/«Подборка») в браузере. Тот же образ, но вместо
+  # ночного прогона поднимает FastAPI-приложение uvicorn'ом. Внутри слушает
+  # 0.0.0.0, наружу опубликован только на loopback хоста — продукт не хостится
+  # наружу. Форма сохранения пишет /data/config.json (валидный по схеме).
+  webui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: job-agent:latest
+    environment:
+      # webui лежит в /app (не отдельный пакет) — кладём его на путь импорта.
+      PYTHONPATH: /app
+    entrypoint: ["python", "-c"]
+    command:
+      - "import uvicorn; from webui.app import create_app; uvicorn.run(create_app('/data/config.json'), host='0.0.0.0', port=8765)"
+    volumes:
+      # Тот же каталог данных, что и у пайплайна: читает/пишет config.json.
+      - ${JOB_AGENT_DATA:-./data}:/data
+    ports:
+      # Только localhost хоста — открыть UI в браузере на http://127.0.0.1:8766.
+      # Внутри контейнера приложение слушает 8765 (дефолт UI); наружу публикуем
+      # на 8766, т.к. 8765 на хосте может быть занят другим сервисом.
+      - "127.0.0.1:8766:8765"
+    restart: unless-stopped
+
 volumes:
   model_cache:
   seen_store:
