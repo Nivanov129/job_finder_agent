@@ -284,8 +284,17 @@ def run_pipeline(
             titles = _derive_all_titles(engine, track_resumes)
             if titles:
                 before = len(posts)
-                posts = filter_posts_by_titles(posts, titles)
-                logger.info("фильтр по названию: %d → %d", before, len(posts))
+                kept = filter_posts_by_titles(posts, titles)
+                # Защита: если фильтр выкосил всё (названия не совпали ни с одним
+                # постом) — он явно слишком узкий, не отсекаем, идём как есть.
+                if kept:
+                    posts = kept
+                    logger.info("фильтр по названию: %d → %d", before, len(posts))
+                else:
+                    logger.warning(
+                        "фильтр по названию ничего не оставил (%d постов) — пропускаю",
+                        before,
+                    )
         to_normalize = len(posts)
         _report("normalize", collected=collected, to_normalize=to_normalize)
 
