@@ -586,35 +586,61 @@ def render_agent() -> str:
     )
 
 
-def render_run(agent_interval: int = 30) -> str:
-    """Страница «Прогон»: статус прогона + режим агента (run.js опрашивает статус)."""
-    agent = (
-        '<section class="card"><div class="card__title">'
-        f'{icon("ti-robot")} Агент · авто-поиск '
-        '<span class="run-status" data-agent-state></span></div>'
-        '<div class="card__meta">Сам запускает поиск каждые N минут и догоняет '
-        "вакансии с момента прошлого прогона.</div>"
-        '<div class="login-flow__row">'
-        '<label class="field" style="max-width:200px"><span class="field__label">'
-        'Пауза между прогонами (мин)</span>'
-        f'<input class="input" type="number" data-agent-interval min="5" max="1440" '
-        f'value="{agent_interval}"></label>'
-        '<button type="button" class="btn btn--accent agent-toggle" '
-        'style="align-self:flex-end"></button></div>'
-        '<div class="card__meta" data-agent-info></div>'
-        "</section>"
+_PERIODS = ((1, "День", "вчера и сегодня"), (3, "3 дня", "короткий хвост"),
+            (7, "Неделя", "стандарт"), (14, "2 недели", "глубокий разбор"))
+_STEPS = (("collect", "ti-rss", "Сбор"), ("normalize", "ti-wand", "AI читает"),
+          ("filter", "ti-filter", "Фильтр"), ("score", "ti-target", "Два процента"))
+
+
+def render_run(agent_interval: int = 30, days: int = 7) -> str:
+    """Экран «Подбор за период»: выбор периода + живая воронка прогона.
+
+    run.js по /run/status переключает idle ⇆ running и наполняет степпер,
+    прогресс-баннер и сетку результатов (по /run/results).
+    """
+    banner = (
+        '<div class="run-banner">'
+        f'{icon("ti-bolt")}<div>Разовый прогон за выбранный период — в отличие от '
+        "агента, не ждёт новых постов, а собирает всё, что вышло за период, прямо "
+        "сейчас. Можно запускать, даже если агент на паузе.</div></div>"
     )
-    return (
-        '<div class="app-header">'
-        f'<span class="app-header__icon">{icon("ti-player-play")}</span>'
-        '<div><div class="card__title">Прогон</div>'
-        '<div class="card__meta">сбор → фильтр → скоринг → .xlsx</div></div>'
-        "</div>"
-        + agent
-        + '<section class="card"><div class="run-status" data-run-status>'
-        f'{icon("ti-loader")} статус…</div></section>'
-        '<p><a href="/">← к настройке</a> · <a href="/results">подборка</a></p>'
+    chips = "".join(
+        f'<button type="button" class="period-chip{" period-chip--on" if d == days else ""}" '
+        f'data-period="{d}"><div class="period-chip__l">{escape(label)}</div>'
+        f'<div class="period-chip__s">{escape(sub)}</div></button>'
+        for d, label, sub in _PERIODS
     )
+    idle = (
+        '<div data-run-idle>'
+        '<section class="card"><div class="run-idle__title">За какой период собрать</div>'
+        f'<div class="period-row">{chips}</div>'
+        '<div class="run-idle__foot">'
+        '<span class="run-idle__meta" data-run-summary></span>'
+        '<button type="button" class="btn btn--accent" data-run-start>'
+        f'{icon("ti-player-play")} Запустить backfill</button></div></section>'
+        '<div class="run-idle__hint">'
+        f'{icon("ti-history")}<div>Выбери период и запусти — здесь развернётся живая '
+        "воронка: сбор → AI читает → фильтр → два процента.</div></div></div>"
+    )
+    steps = "".join(
+        f'<div class="step" data-step="{key}"><div class="step__circle">{icon(ic)}</div>'
+        f'<div class="step__l"><div class="step__label">{escape(label)}</div>'
+        f'<div class="step__sub mono" data-step-sub></div></div>'
+        f'<div class="step__conn"></div></div>'
+        for key, ic, label in _STEPS
+    )
+    active = (
+        '<div data-run-active hidden>'
+        f'<div class="stepper">{steps}</div>'
+        '<section class="card run-progress"><div class="run-progress__icon" '
+        f'data-run-picon>{icon("ti-loader")}</div>'
+        '<div class="run-progress__main"><div class="run-progress__title" '
+        'data-run-ptitle>Прогон…</div><div class="run-progress__sub" data-run-psub>'
+        "</div></div><div class=\"run-progress__bar\"><div data-run-pbar></div></div>"
+        '<div class="run-progress__pct mono" data-run-ppct></div></section>'
+        '<div class="res-grid" data-res-grid></div></div>'
+    )
+    return banner + idle + active
 
 
 # ── Экран 2 «Подборка» (Task 5.2) ─────────────────────────────────

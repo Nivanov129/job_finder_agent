@@ -857,3 +857,42 @@ textarea.input {
 .push-row__co { font-size: 10.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .push-row .ti { color: var(--text-accent); font-size: 15px; }
 .push-empty { font-size: 12px; color: #A9A89F; line-height: 1.5; padding: 8px 2px; }
+
+/* — «Подбор за период» (backfill) — */
+.run-banner { display: flex; align-items: flex-start; gap: 9px; background: var(--bg-warning); border: 0.5px solid var(--border-warning); border-radius: 10px; padding: 11px 13px; }
+.run-banner .ti { font-size: 17px; color: var(--text-warning); margin-top: 1px; flex: none; }
+.run-banner div { font-size: 12.5px; color: #633806; line-height: 1.5; }
+.run-idle__title { font-size: 13px; font-weight: 600; margin-bottom: 13px; }
+.period-row { display: flex; gap: 9px; flex-wrap: wrap; }
+.period-chip { font: inherit; text-align: left; cursor: pointer; min-width: 120px; border: 0.5px solid var(--border); background: var(--surface-1); border-radius: 11px; padding: 11px 14px; }
+.period-chip--on { border: 1.5px solid var(--border-accent); background: var(--bg-accent); }
+.period-chip__l { font-size: 14px; font-weight: 600; }
+.period-chip__s { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.run-idle__foot { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 18px; padding-top: 16px; border-top: 0.5px solid rgba(0,0,0,.07); }
+.run-idle__meta { font-size: 12px; color: var(--text-secondary); }
+.run-idle__foot .btn { margin-left: auto; }
+.run-idle__hint { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 40px 20px; color: #B7B6AE; text-align: center; background: var(--surface-sub); border: 0.5px dashed rgba(0,0,0,.14); border-radius: 14px; margin-top: 14px; }
+.run-idle__hint .ti { font-size: 32px; }
+.run-idle__hint div { font-size: 13px; max-width: 320px; line-height: 1.55; }
+/* степпер */
+.stepper { display: flex; align-items: center; margin: 2px 0 4px; }
+.step { flex: 1; display: flex; align-items: center; gap: 11px; min-width: 0; }
+.step__circle { width: 32px; height: 32px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font-size: 16px; background: var(--band-grey-bg); color: var(--text-muted); }
+.step--active .step__circle { background: var(--bg-accent); color: var(--text-accent); animation: ja-pulse 1.6s infinite; }
+.step--done .step__circle { background: var(--text-accent); color: #fff; }
+.step__label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.step--active .step__label, .step--done .step__label { color: var(--text-primary); }
+.step__sub { font-size: 10px; color: var(--text-muted); height: 13px; }
+.step__conn { flex: 1; height: 2px; background: var(--band-grey-bg); border-radius: 2px; margin: 0 4px; min-width: 14px; }
+.step--done .step__conn, .step--active .step__conn { background: var(--border-accent); }
+.step:last-child .step__conn { display: none; }
+/* прогресс-баннер */
+.run-progress { display: flex; align-items: center; gap: 14px; }
+.run-progress__icon { width: 32px; height: 32px; border-radius: 9px; flex: none; display: flex; align-items: center; justify-content: center; background: var(--bg-accent); color: var(--text-accent); font-size: 16px; }
+.run-progress__icon--done { background: var(--band-green-bg); color: var(--text-success); }
+.run-progress__main { flex: 1; min-width: 0; }
+.run-progress__title { font-size: 13px; font-weight: 600; }
+.run-progress__sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.run-progress__bar { width: 140px; height: 6px; background: #EEECE4; border-radius: 3px; overflow: hidden; flex: none; }
+.run-progress__bar > div { height: 100%; background: var(--fill-accent); border-radius: 3px; width: 0; transition: width .4s; }
+.run-progress__pct { font-size: 11px; color: var(--text-secondary); width: 36px; text-align: right; flex: none; }

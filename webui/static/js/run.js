@@ -1,94 +1,81 @@
-// Страница «Прогон»: опрашивает /run/status и показывает прогресс/итог/ошибку.
+// «Подбор за период»: выбор периода → /run/start → живая воронка
+// (степпер + прогресс-баннер). Сетку результатов наполняет results.js.
 (function () {
   "use strict";
-  var box = document.querySelector("[data-run-status]");
-  if (!box) return;
+  function $(s) { return document.querySelector(s); }
+  var idle = $("[data-run-idle]");
+  var active = $("[data-run-active]");
+  if (!idle || !active) return;
+  var days = 7;
+  var sel = $(".period-chip--on");
+  if (sel) days = parseInt(sel.getAttribute("data-period"), 10) || 7;
 
-  function render(s) {
-    if (s.status === "running") {
-      box.className = "run-status";
-      var label, detail = "";
-      if (s.stage === "normalize") {
-        label = "нормализую (AI)";
-        detail = " " + (s.normalized || 0) + " / " + (s.to_normalize || "?") +
-          (s.collected ? "  · собрано " + s.collected : "");
-      } else if (s.stage === "score") {
-        label = "скоринг (AI)";
-        detail = " " + (s.scored || 0) + " / " + (s.after_filter || "?");
-      } else {
-        label = "собираю вакансии";
-        detail = s.collected ? " собрано " + s.collected : "";
-      }
-      box.innerHTML = '<i class="ti ti-loader"></i> Прогон: ' + label + "…" + detail;
-    } else if (s.status === "done") {
-      box.className = "run-status is-ok";
-      var dl = s.output
-        ? ' · <a class="btn" href="/run/output.xlsx" download>' +
-          '<i class="ti ti-download"></i> Скачать .xlsx</a>'
-        : "";
-      box.innerHTML =
-        '<i class="ti ti-circle-check"></i> Готово: собрано ' + s.collected +
-        " · после фильтра " + s.after_filter + " · в выгрузке " + s.written + dl;
-      clearInterval(timer);
-    } else if (s.status === "error") {
-      box.className = "run-status is-error";
-      box.innerHTML =
-        '<i class="ti ti-alert-triangle"></i> Ошибка прогона: ' + (s.message || "");
-      clearInterval(timer);
-    } else {
-      box.className = "run-status";
-      box.textContent = "Прогон ещё не запускался.";
+  // выбор периода
+  document.addEventListener("click", function (ev) {
+    var c = ev.target.closest("[data-period]");
+    if (c) {
+      days = parseInt(c.getAttribute("data-period"), 10) || 7;
+      document.querySelectorAll("[data-period]").forEach(function (b) {
+        b.classList.toggle("period-chip--on", b === c);
+      });
+      return;
     }
+    if (ev.target.closest("[data-run-start]")) {
+      var fd = new FormData();
+      fd.append("days", String(days));
+      fetch("/run/start", { method: "POST", body: fd }).then(poll);
+    }
+  });
+
+  var STEPS = ["collect", "normalize", "filter", "score"];
+  var ORDER = { collect: 0, normalize: 1, filter: 2, score: 3 };
+
+  function paintStepper(s) {
+    var cur = ORDER[s.stage] != null ? ORDER[s.stage] : (s.status === "done" ? 4 : 0);
+    STEPS.forEach(function (key, i) {
+      var el = $('[data-step="' + key + '"]');
+      if (!el) return;
+      var done = s.status === "done" || i < cur;
+      var activeStep = i === cur && s.status === "running";
+      el.className = "step" + (done ? " step--done" : "") + (activeStep ? " step--active" : "");
+      var circle = el.querySelector(".step__circle");
+      if (circle && done) circle.innerHTML = '<i class="ti ti-check"></i>';
+      var sub = el.querySelector("[data-step-sub]");
+      if (sub) {
+        sub.textContent =
+          key === "collect" ? (s.collected ? s.collected + " постов" : "") :
+          key === "normalize" ? (s.to_normalize ? (s.normalized || 0) + " / " + s.to_normalize : "") :
+          key === "filter" ? (s.after_filter ? s.after_filter + " финалистов" : "") :
+          key === "score" ? (s.after_filter ? (s.scored || 0) + " / " + s.after_filter : "") : "";
+      }
+    });
+  }
+
+  function paintProgress(s) {
+    var title = $("[data-run-ptitle]"), sub = $("[data-run-psub]");
+    var bar = $("[data-run-pbar]"), pct = $("[data-run-ppct]"), pic = $("[data-run-picon]");
+    var p = 0, t = "Прогон…", sb = "";
+    if (s.stage === "collect" || (!s.stage && s.status === "running")) { t = "Собираю вакансии"; p = 8; }
+    else if (s.stage === "normalize") { t = "AI читает посты"; sb = "нормализую " + (s.normalized || 0) + " / " + (s.to_normalize || "?"); p = s.to_normalize ? 10 + 50 * (s.normalized / s.to_normalize) : 30; }
+    else if (s.stage === "score") { t = "Скоринг · два процента"; sb = "оцениваю " + (s.scored || 0) + " / " + (s.after_filter || "?"); p = s.after_filter ? 65 + 35 * (s.scored / s.after_filter) : 70; }
+    if (s.status === "done") { t = "Готово"; sb = "собрано " + s.collected + " · финалистов " + (s.after_filter || 0) + " · в выгрузке " + (s.written || 0); p = 100; }
+    if (s.status === "error") { t = "Ошибка прогона"; sb = s.message || ""; }
+    if (title) title.textContent = t;
+    if (sub) sub.textContent = sb;
+    if (bar) bar.style.width = Math.round(p) + "%";
+    if (pct) pct.textContent = s.status === "running" ? Math.round(p) + "%" : (s.status === "done" ? "100%" : "");
+    if (pic) pic.className = "run-progress__icon" + (s.status === "done" ? " run-progress__icon--done" : "");
+    if (pic) pic.innerHTML = '<i class="ti ' + (s.status === "done" ? "ti-circle-check" : s.status === "error" ? "ti-alert-triangle" : "ti-loader") + '"></i>';
   }
 
   function poll() {
-    fetch("/run/status")
-      .then(function (r) { return r.json(); })
-      .then(render)
-      .catch(function () {});
+    fetch("/run/status").then(function (r) { return r.json(); }).then(function (s) {
+      var running = s.status === "running" || s.status === "done" || s.status === "error";
+      idle.hidden = running;
+      active.hidden = !running;
+      if (running) { paintStepper(s); paintProgress(s); }
+    }).catch(function () {});
   }
-
-  // ── Режим агента ──────────────────────────────────────────────────
-  function pollAgent() {
-    fetch("/agent/status")
-      .then(function (r) { return r.json(); })
-      .then(function (a) {
-        var state = document.querySelector("[data-agent-state]");
-        var info = document.querySelector("[data-agent-info]");
-        var btn = document.querySelector(".agent-toggle");
-        if (btn) btn.textContent = a.enabled ? "Выключить агента" : "Включить агента";
-        if (state) {
-          state.textContent = a.enabled ? "вкл" : "выкл";
-          state.className = "run-status" + (a.enabled ? " is-ok" : "");
-        }
-        if (info) {
-          var parts = [];
-          if (a.last_run) parts.push("последний прогон: " + new Date(a.last_run).toLocaleString());
-          else parts.push("прогонов ещё не было");
-          if (a.enabled && a.seconds_to_next != null)
-            parts.push("следующий через ~" + Math.ceil(a.seconds_to_next / 60) + " мин");
-          info.textContent = parts.join(" · ");
-        }
-      })
-      .catch(function () {});
-  }
-
-  document.addEventListener("click", function (ev) {
-    if (!ev.target.closest(".agent-toggle")) return;
-    fetch("/agent/status")
-      .then(function (r) { return r.json(); })
-      .then(function (a) {
-        if (a.enabled) return fetch("/agent/stop", { method: "POST" });
-        var iv = document.querySelector("[data-agent-interval]");
-        var fd = new FormData();
-        fd.append("interval", iv ? iv.value : "30");
-        return fetch("/agent/start", { method: "POST", body: fd });
-      })
-      .then(function () { pollAgent(); });
-  });
-
-  setInterval(poll, 2000);
-  setInterval(pollAgent, 5000);
+  setInterval(poll, 1500);
   poll();
-  pollAgent();
 })();

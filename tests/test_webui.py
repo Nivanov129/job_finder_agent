@@ -495,7 +495,7 @@ def test_save_backfill_starts_run_and_shows_run_page(tmp_path: Path) -> None:
     form["action"] = "backfill"
     r = client.post("/save", data=form)
     assert r.status_code == 200
-    assert "Агент · авто-поиск" in r.text and "/static/js/run.js" in r.text
+    assert "Запустить backfill" in r.text and "/static/js/run.js" in r.text
     # прогон реально запущен (фейк-раннер позвали)
     for _ in range(100):
         if started:

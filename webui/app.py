@@ -84,6 +84,12 @@ _HEAD = """\
 #: Куда писать конфиг по умолчанию: корень репо (рядом с config.schema.json).
 _DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.json"
 
+#: Скрипты экрана «Подбор за период»: воронка (run.js) + сетка карточек (results.js).
+_RUN_SCRIPTS = (
+    '<script src="/static/js/run.js"></script>'
+    '<script src="/static/js/results.js"></script>'
+)
+
 
 #: Заголовок/подзаголовок топбара по маршруту (как в прототипе).
 _TITLES: dict[str, tuple[str, str]] = {
@@ -318,12 +324,16 @@ def create_app(
             )
         action = str(form.get("action", "save"))
         if action == "backfill":
-            # Конфиг сохранён — запускаем фоновый прогон и ведём на страницу «Прогон».
+            # Конфиг сохранён — запускаем фоновый прогон и ведём на «Подбор за период».
             runner.start(target)
+            cfg = _load_raw(target)
             return HTMLResponse(
                 page(
-                    render_run(int(_load_raw(target).get('agent_interval_minutes', 30))),
-                    scripts='<script src="/static/js/run.js"></script>',
+                    render_run(
+                        int(cfg.get("agent_interval_minutes", 30)),
+                        int(cfg.get("backfill_days", 7)),
+                    ),
+                    scripts=_RUN_SCRIPTS,
                     active="/run",
                 )
             )
@@ -439,9 +449,13 @@ def create_app(
 
     @app.get("/run", response_class=HTMLResponse)
     def run_page() -> str:
+        cfg = _load_raw(target)
         return page(
-            render_run(int(_load_raw(target).get('agent_interval_minutes', 30))),
-            scripts='<script src="/static/js/run.js"></script>',
+            render_run(
+                int(cfg.get("agent_interval_minutes", 30)),
+                int(cfg.get("backfill_days", 7)),
+            ),
+            scripts=_RUN_SCRIPTS,
             active="/run",
         )
 
@@ -453,6 +467,21 @@ def create_app(
     def run_results() -> JSONResponse:
         # Результаты текущего/последнего прогона (наполняются по мере скоринга).
         return JSONResponse({"results": runner.results()})
+
+    @app.post("/run/start")
+    async def run_start(request: Request) -> JSONResponse:
+        # «Подбор за период»: сохранить глубину в днях и запустить разовый прогон.
+        form = await request.form()
+        try:
+            days = max(1, min(90, int(str(form.get("days", "")) or 7)))
+        except ValueError:
+            days = 7
+        try:
+            _merge_and_validate({"backfill_days": days}, target)
+        except ConfigError:
+            pass
+        ok = runner.start(target)
+        return JSONResponse({"ok": ok, "days": days, "running": runner.is_running()})
 
     @app.post("/agent/start")
     async def agent_start(request: Request) -> JSONResponse:
