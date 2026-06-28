@@ -52,8 +52,15 @@
     if (empty) empty.hidden = true;
     var tracks = [];
     results.forEach(function (r) { if (r.track && tracks.indexOf(r.track) < 0) tracks.push(r.track); });
-    if (filtersEl) filtersEl.innerHTML = chip("Все", "all") + tracks.map(function (t) { return chip(t, t); }).join("");
-    var shown = results.filter(function (r) { return filter === "all" || r.track === filter; });
+    if (filtersEl) filtersEl.innerHTML =
+      chip("Все", "all") + chip("Точные ≥80", "green") + chip("Stretch 70–79", "amber") +
+      tracks.map(function (t) { return chip(t, t); }).join("");
+    var shown = results.filter(function (r) {
+      if (filter === "all") return true;
+      if (filter === "green") return r.resume >= 80;
+      if (filter === "amber") return r.resume >= 70 && r.resume < 80;
+      return r.track === filter;
+    });
     shown.sort(function (a, b) { return b.resume - a.resume; });
     grid.innerHTML = shown.map(card).join("");
   }
