@@ -58,8 +58,10 @@ services:
       FASTEMBED_CACHE_PATH: /models
       JOB_AGENT_SEEN_DB: /var/lib/job-agent/job_agent_seen.db
     env_file:
-      # Секреты (API-ключи, Telethon, токен бота) — только через .env, не в образ.
-      - path: .env
+      # Секреты и токены авторизации AI-движков (CLAUDE_CODE_OAUTH_TOKEN,
+      # OPENAI_API_KEY, ANTHROPIC_API_KEY, Telethon, токен бота) — только через
+      # .env в каталоге данных, его пишет страница web-UI «AI · авторизация».
+      - path: ./data/.env
         required: false
     volumes:
       # Данные участника: config.json, резюме, шаблоны, карта поиска, выходной xlsx.
@@ -68,6 +70,12 @@ services:
       - model_cache:/models:ro
       # Том для seen-store (дедуп/водяной знак nightly) — переживает пересоздание.
       - seen_store:/var/lib/job-agent
+      # Изолированный конфиг-дир CLI-агентов (claude/codex): по умолчанию свой
+      # каталог под ./data/auth (НЕ трогаем host ~/.claude — иначе контейнер
+      # засоряет историю/сессии и гонит refresh токена). Чтобы переиспользовать
+      # host-логин, задать JOB_AGENT_CLAUDE_DIR=~/.claude (аналогично codex).
+      - ${JOB_AGENT_CLAUDE_DIR:-./data/auth/claude}:/root/.claude
+      - ${JOB_AGENT_CODEX_DIR:-./data/auth/codex}:/root/.codex
     restart: unless-stopped
 
   # Web-UI (экраны «Настройка»/«Подборка») в браузере. Тот же образ, но вместо
@@ -82,12 +90,20 @@ services:
     environment:
       # webui лежит в /app (не отдельный пакет) — кладём его на путь импорта.
       PYTHONPATH: /app
+    env_file:
+      # Те же токены авторизации, что у пайплайна: статус-пробы и «Проверить» на
+      # странице «AI · авторизация» должны видеть ту же авторизацию.
+      - path: ./data/.env
+        required: false
     entrypoint: ["python", "-c"]
     command:
       - "import uvicorn; from webui.app import create_app; uvicorn.run(create_app('/data/config.json'), host='0.0.0.0', port=8765)"
     volumes:
-      # Тот же каталог данных, что и у пайплайна: читает/пишет config.json.
+      # Тот же каталог данных, что и у пайплайна: читает/пишет config.json и .env.
       - ${JOB_AGENT_DATA:-./data}:/data
+      # Тот же изолированный конфиг-дир CLI-агентов, что у пайплайна (см. выше).
+      - ${JOB_AGENT_CLAUDE_DIR:-./data/auth/claude}:/root/.claude
+      - ${JOB_AGENT_CODEX_DIR:-./data/auth/codex}:/root/.codex
     ports:
       # Опубликован на всех интерфейсах хоста — UI доступен из локальной сети
       # (http://<IP-хоста>:8766). ВНИМАНИЕ: у UI нет аутентификации, а форма
