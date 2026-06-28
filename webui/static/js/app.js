@@ -4,24 +4,20 @@
   "use strict";
 
   function paint(a) {
-    var orb = document.querySelector("[data-agent-orb]");
+    var on = !!a.enabled;
+    document.querySelectorAll("[data-agent-orb]").forEach(function (o) {
+      o.className = "orb" + (on ? " orb--on" : " orb--amber");
+    });
     var host = document.querySelector("[data-agent-host]");
     var sub = document.querySelector("[data-agent-hostsub]");
-    var pause = document.querySelector("[data-agent-pause]");
-    var on = !!a.enabled;
-    if (orb) orb.className = "orb" + (on ? " orb--on" : " orb--amber");
+    var mode = document.querySelector("[data-agent-mode]");
     if (host) host.textContent = on ? "Агент работает" : "Агент на паузе";
+    if (mode) mode.textContent = on ? "always-on" : "на паузе";
     if (sub) {
       var parts = [];
-      if (a.last_run) parts.push("последний: " + new Date(a.last_run).toLocaleTimeString());
+      if (a.last_run) parts.push("скан: " + new Date(a.last_run).toLocaleTimeString());
       if (on && a.seconds_to_next != null) parts.push("след. ~" + Math.ceil(a.seconds_to_next / 60) + " мин");
       sub.textContent = parts.join(" · ") || (on ? "следит за каналами" : "мониторинг на паузе");
-    }
-    if (pause) {
-      pause.className = "btn-pause agent-toggle" + (on ? "" : " btn-pause--go");
-      pause.innerHTML =
-        '<i class="ti ' + (on ? "ti-player-pause" : "ti-player-play") + '"></i> <span>' +
-        (on ? "Пауза" : "Запустить агента") + "</span>";
     }
   }
 

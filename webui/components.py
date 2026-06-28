@@ -30,12 +30,11 @@ __all__ = [
     "status_pill",
 ]
 
-#: Пункты бокового меню: (маршрут, иконка, подпись) или None — разделитель.
-NAV_ITEMS: tuple[tuple[str, str, str] | None, ...] = (
+#: Пункты бокового меню: (маршрут, иконка, подпись).
+NAV_ITEMS: tuple[tuple[str, str, str], ...] = (
     ("/agent", "ti-radar-2", "Агент"),
-    ("/run", "ti-history-toggle", "Подбор за период"),
-    ("/results", "ti-layout-grid", "Подборка"),
-    None,
+    ("/run", "ti-calendar-search", "Подбор за период"),
+    ("/results", "ti-stack-2", "Подборка"),
     ("/", "ti-adjustments", "Настройка"),
     ("/engine", "ti-cpu", "AI · авторизация"),
     ("/telegram", "ti-brand-telegram", "Telegram"),
@@ -43,36 +42,32 @@ NAV_ITEMS: tuple[tuple[str, str, str] | None, ...] = (
 
 
 def nav(active: str = "") -> str:
-    """Левый сайдбар: бренд + карточка хоста (агент) + меню + кнопка паузы.
+    """Левый сайдбар: бренд + меню + карточка хоста (внизу) — как в прототипе.
 
-    `active` — текущий маршрут, его пункт подсвечивается. Карточку агента и
-    кнопку паузы наполняет `app.js` опросом `/agent/status`.
+    Карточку хоста (агент вкл/пауза) наполняет `app.js` опросом `/agent/status`.
     """
-    items = ""
-    for it in NAV_ITEMS:
-        if it is None:
-            items += '<div class="nav__divider"></div>'
-            continue
-        path, ic, label = it
-        cls = "nav__item nav__item--active" if path == active else "nav__item"
-        items += f'<a class="{cls}" href="{path}">{icon(ic)}<span>{escape(label)}</span></a>'
+    items = "".join(
+        f'<a class="nav__item{" nav__item--active" if path == active else ""}" '
+        f'href="{path}">{icon(ic)}<span>{escape(label)}</span></a>'
+        for path, ic, label in NAV_ITEMS
+    )
     return (
         '<aside class="sidebar">'
         '<div class="brand">'
         f'<div class="brand__logo">{icon("ti-radar-2")}</div>'
         '<div><div class="brand__name">Job Agent</div>'
-        '<div class="brand__sub">локально · ваш компьютер</div></div>'
-        "</div>"
-        '<div class="host-card">'
-        '<div class="host-card__row"><span class="orb" data-agent-orb></span>'
-        '<span class="host-card__text" data-agent-host>хост · проверяю…</span></div>'
-        '<div class="host-card__sub" data-agent-hostsub></div>'
+        '<div class="brand__sub">локальный подбор вакансий</div></div>'
         "</div>"
         f'<nav class="nav">{items}</nav>'
         '<div class="sidebar__foot">'
-        '<button type="button" class="btn-pause agent-toggle" data-agent-pause>'
-        f'{icon("ti-player-pause")} <span>Пауза</span></button></div>'
-        "</aside>"
+        '<div class="host-card">'
+        '<span class="orb" data-agent-orb></span>'
+        '<div class="host-card__body"><div class="host-card__text" data-agent-host>'
+        'хост · проверяю…</div>'
+        '<div class="host-card__sub" data-agent-hostsub></div></div></div>'
+        '<div class="lock-note">'
+        f'{icon("ti-lock")} данные не покидают компьютер</div>'
+        "</div></aside>"
     )
 
 

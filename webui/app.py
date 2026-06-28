@@ -85,15 +85,33 @@ _HEAD = """\
 _DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.json"
 
 
-def page(body: str, *, scripts: str = "", active: str = "") -> str:
-    """Обёртка страницы: верхнее меню + единственный столбец max-width 720px.
+#: Заголовок/подзаголовок топбара по маршруту (как в прототипе).
+_TITLES: dict[str, tuple[str, str]] = {
+    "/agent": ("Агент", "always-on · реагирует на новые посты в реальном времени"),
+    "/run": ("Подбор за период", "разовый прогон за выбранный отрезок времени"),
+    "/results": ("Подборка", "финалисты с двумя процентами, по убыванию резюме %"),
+    "/": ("Настройка", "направления, источники и выхлоп"),
+    "/engine": ("Движок AI", "твой AI считает каждое совпадение локально"),
+    "/telegram": ("Telegram", "каналы-источники и бот для выдачи"),
+}
 
-    `active` — текущий маршрут для подсветки пункта меню.
-    """
+
+def page(body: str, *, scripts: str = "", active: str = "") -> str:
+    """Оболочка: сайдбар + топбар (заголовок экрана + чип режима) + контент."""
+    from html import escape as _esc
+
+    title, sub = _TITLES.get(active, ("Job Agent", ""))
+    topbar = (
+        '<header class="topbar"><div class="topbar__t">'
+        f'<div class="topbar__title">{_esc(title)}</div>'
+        f'<div class="topbar__sub">{_esc(sub)}</div></div>'
+        '<span class="mode-chip" data-mode-chip><span class="orb" data-agent-orb>'
+        "</span><span data-agent-mode>…</span></span></header>"
+    )
     return (
         "<!doctype html><html lang=ru><head>"
         f"{_HEAD}</head><body><div class=app>{nav(active)}"
-        f'<main class=main><div class="main__inner">{body}</div></main></div>'
+        f'<main class=main>{topbar}<div class="main__inner">{body}</div></main></div>'
         f'{scripts}<script src="/static/js/app.js"></script></body></html>'
     )
 
