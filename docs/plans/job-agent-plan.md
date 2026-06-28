@@ -165,9 +165,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 1.9: Пре-фильтр + роутинг
-- [ ] `prefilter.py` по `prompts/prefilter-routing.md`: косинусы против всех треков → `best_track`; гейт по роли (трек → иначе глобальный); порог `best_sim`; предварительный `map_fit`; опц. мульти-трек по `multi_track_delta`; отсечение до лимита финалистов; N=1 — тривиальный роутинг. Возвращает `list[RoutedVacancy]`.
-- [ ] Тесты роутинга, гейта, мульти-трека, N=1.
-- [ ] Mark completed
+- [x] `prefilter.py` по `prompts/prefilter-routing.md`: косинусы против всех треков → `best_track`; гейт по роли (трек → иначе глобальный); порог `best_sim`; предварительный `map_fit`; опц. мульти-трек по `multi_track_delta`; отсечение до лимита финалистов; N=1 — тривиальный роутинг. Возвращает `list[RoutedVacancy]`.
+- [x] Тесты роутинга, гейта, мульти-трека, N=1.
+- [x] Mark completed
 
 ### Task 1.10: Web-поиск
 - [ ] `websearch/base.py` + `searxng.py` + `serp.py`, фабрика по `web_search.provider`, за интерфейсом.
