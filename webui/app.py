@@ -31,6 +31,7 @@ from webui.env_store import merge_env, parse_env
 from webui.forms import config_from_form, engine_config_from_form
 from webui.login_flow import LoginManager, LoginSpawner, default_spawner
 from webui.render import (
+    render_agent,
     render_engine,
     render_results,
     render_run,
@@ -91,8 +92,9 @@ def page(body: str, *, scripts: str = "", active: str = "") -> str:
     """
     return (
         "<!doctype html><html lang=ru><head>"
-        f"{_HEAD}</head><body>{nav(active)}"
-        f"<main class=col>{body}</main>{scripts}</body></html>"
+        f"{_HEAD}</head><body><div class=app>{nav(active)}"
+        f'<main class=main><div class="main__inner">{body}</div></main></div>'
+        f'{scripts}<script src="/static/js/app.js"></script></body></html>'
     )
 
 
@@ -135,6 +137,14 @@ def create_app(
             render_settings(_load_raw(target)),
             scripts='<script src="/static/js/settings.js"></script>',
             active="/",
+        )
+
+    @app.get("/agent", response_class=HTMLResponse)
+    def agent_page() -> str:
+        return page(
+            render_agent(),
+            scripts='<script src="/static/js/agent.js"></script>',
+            active="/agent",
         )
 
     @app.get("/results", response_class=HTMLResponse)

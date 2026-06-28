@@ -29,6 +29,7 @@ __all__ = [
     "vacancy_card",
     "render_results",
     "render_run",
+    "render_agent",
     "render_telegram",
 ]
 
@@ -528,6 +529,35 @@ def render_telegram(*, has_session: bool = False, saved: list[str] | None = None
         "</div></div></div>"
         + login
         + channels
+    )
+
+
+def render_agent() -> str:
+    """Экран «Агент» (дашборд авто-поиска). Данные наполняет agent.js."""
+    return (
+        '<div class="app-header">'
+        f'<span class="app-header__icon">{icon("ti-radar-2")}</span>'
+        '<div><div class="card__title" data-agent-title>Агент</div>'
+        '<div class="card__meta" data-agent-subtitle>авто-поиск вакансий под твоё '
+        "резюме в реальном времени</div></div></div>"
+        # сводка-конвейер
+        '<section class="card pipeline" data-agent-pipe></section>'
+        # лента + правая колонка
+        '<div class="agent-grid">'
+        '<section class="card feed-card">'
+        '<div class="feed-card__head">'
+        f'<span class="card__title">{icon("ti-activity-heartbeat")} Лента · '
+        'оценивается на лету</span>'
+        '<span class="live-tag" data-agent-live>live</span></div>'
+        '<div class="feed" data-agent-feed></div></section>'
+        '<div class="agent-side">'
+        '<section class="card">'
+        f'<div class="card__title">{icon("ti-sparkles")} Свежие совпадения</div>'
+        '<div class="matches" data-agent-matches></div></section>'
+        '<section class="card">'
+        f'<div class="card__title">{icon("ti-chart-bar")} Статистика</div>'
+        '<div class="stats" data-agent-stats></div></section>'
+        "</div></div>"
     )
 
 

@@ -3,12 +3,15 @@
    один акцентный цвет, без теней и градиентов. */
 
 :root {
+  /* системные шрифты (прототип — Onest + JetBrains Mono; без CDN берём системные) */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 
   /* поверхности */
   --surface-0: #f5f4ef;
   --surface-1: #faf9f5;
   --surface-2: #ffffff;
+  --surface-sub: #FBFCF8;   /* подсветка строки-совпадения */
 
   /* текст */
   --text-primary: #1a1a18;
@@ -31,13 +34,28 @@
   --bg-warning: #FAEEDA;
   --border-warning: #EF9F27;
 
-  /* успех */
+  /* успех + диапазоны бейджа «резюме %» (из presentation.py) */
   --text-success: #3B6D11;
+  --band-green-bg: #EAF3DE; --band-green-fg: #27500A;
+  --band-amber-bg: #FAEEDA; --band-amber-fg: #633806;
+  --band-grey-bg: #F1EFE8;  --band-grey-fg: #444441;
+  /* тег направления */
+  --track-bg: #EEEDFE; --track-fg: #3C3489;
 
   --radius: 8px;          /* кнопки/инпуты */
   --radius-card: 12px;    /* карточки */
   --radius-panel: 10px;   /* внутренние панели */
+  --radius-app: 16px;     /* внешняя оболочка */
 }
+
+/* анимации прототипа */
+@keyframes ja-orb { 0%,100%{box-shadow:0 0 0 0 rgba(59,109,17,.32)} 50%{box-shadow:0 0 0 7px rgba(59,109,17,0)} }
+@keyframes ja-orb-amber { 0%,100%{box-shadow:0 0 0 0 rgba(133,79,11,.30)} 50%{box-shadow:0 0 0 7px rgba(133,79,11,0)} }
+@keyframes ja-spin { to { transform: rotate(360deg) } }
+@keyframes ja-in { from{opacity:0;transform:translateY(-7px)} to{opacity:1;transform:none} }
+@keyframes ja-toast { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+@keyframes ja-fresh { 0%,100%{background:#EAF3DE} 50%{background:#dcecc8} }
+@keyframes ja-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(43,127,212,.35)} 50%{box-shadow:0 0 0 5px rgba(43,127,212,0)} }
 
 * { box-sizing: border-box; }
 
@@ -55,14 +73,34 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* единственный прокручиваемый столбец */
-.col {
-  max-width: 720px;
+/* оболочка: левый сайдбар + основная область */
+.app {
+  display: flex;
+  min-height: 100vh;
+  background: var(--surface-0);
+}
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 26px 30px 64px;
+}
+.main__inner {
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 24px 16px 64px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+/* колонка форм-экранов внутри основной области */
+.col {
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .app { flex-direction: column; }
+  .main { padding: 18px 16px 80px; }
 }
 
 a { color: var(--text-accent); }

@@ -41,7 +41,7 @@ def test_index_renders(client: TestClient) -> None:
     assert "text/html" in r.headers["content-type"]
     body = r.text
     # единственный столбец и шапка-каркас
-    assert 'class="col"' in body or "class=col" in body
+    assert "class=app" in body and "class=main" in body  # сайдбар-оболочка
     assert "ti-radar-2" in body
 
 
@@ -815,4 +815,4 @@ def test_results_route_renders(client: TestClient) -> None:
     assert "text/html" in r.headers["content-type"]
     body = r.text
     assert "Подборка" in body
-    assert 'class="col"' in body or "class=col" in body
+    assert "class=app" in body and "class=main" in body  # сайдбар-оболочка
