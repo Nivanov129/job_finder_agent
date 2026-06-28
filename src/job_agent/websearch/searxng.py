@@ -17,7 +17,11 @@ from .base import Searcher, SearchResult
 if TYPE_CHECKING:
     from ..config import Config
 
-__all__ = ["SearxngSearcher", "HttpGet", "build_request", "parse_response"]
+__all__ = ["SearxngSearcher", "HttpGet", "build_request", "parse_response", "DEFAULT_BASE_URL"]
+
+# Дефолтный адрес SearXNG — сервис из compose. Так web-поиск работает «из коробки»
+# без ручной настройки; переопределяется env `JOB_AGENT_SEARXNG_URL` или конфигом.
+DEFAULT_BASE_URL = "http://searxng:8080"
 
 # (url, params) -> распарсенный JSON-ответ.
 HttpGet = Callable[[str, dict[str, str]], dict[str, Any]]
@@ -73,10 +77,17 @@ class SearxngSearcher(Searcher):
 
     @classmethod
     def from_config(cls, config: Config, *, transport: HttpGet | None = None) -> SearxngSearcher:
+        # URL не обязателен: дефолт — сервис SearXNG из compose (env переопределяет),
+        # чтобы web-поиск работал без ручной настройки.
+        import os
+
         ws = config.web_search
-        if ws is None or not ws.url:
-            raise ConfigError("web_search.provider='searxng' требует поля 'web_search.url'")
-        return cls(ws.url, transport=transport)
+        url = (
+            (ws.url if ws else None)
+            or os.environ.get("JOB_AGENT_SEARXNG_URL")
+            or DEFAULT_BASE_URL
+        )
+        return cls(url, transport=transport)
 
     def search(self, query: str, *, max_results: int = 5) -> list[SearchResult]:
         url, params = build_request(self._base_url, query)

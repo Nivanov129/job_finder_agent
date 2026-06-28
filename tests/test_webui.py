@@ -288,7 +288,6 @@ def _single_track_form() -> dict[str, str]:
         "cover_threshold": "75",
         "use_aggregators": "on",
         "search_map_path": "./search-map.md",
-        "web_search_url": "http://localhost:8080",
         "action": "save",
     }
 

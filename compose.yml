@@ -57,6 +57,8 @@ services:
     environment:
       FASTEMBED_CACHE_PATH: /models
       JOB_AGENT_SEEN_DB: /var/lib/job-agent/job_agent_seen.db
+      # Web-поиск (контакты) работает без настройки в UI — дефолтный SearXNG из стека.
+      JOB_AGENT_SEARXNG_URL: http://searxng:8080
     env_file:
       # Секреты и токены авторизации AI-движков (CLAUDE_CODE_OAUTH_TOKEN,
       # OPENAI_API_KEY, ANTHROPIC_API_KEY, OLLAMA_API_KEY, Telethon, токен бота) — только через

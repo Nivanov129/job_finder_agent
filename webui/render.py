@@ -305,7 +305,6 @@ def render_engine(
     scoring_engine: str = "cli",
     cli_tool: str = "codex",
     ollama_model: str = "",
-    web_search_url: str = "",
     has_ollama_key: bool = False,
 ) -> str:
     """Экран «AI · авторизация»: выбор движка, статус, авторизация, web-поиск.
@@ -367,16 +366,6 @@ def render_engine(
         visible=active == "ollama",
         with_test=False,  # у Ollama своя кнопка «Загрузить модели» вместо «Проверить»
     )
-    web = (
-        '<section class="card">'
-        f'<div class="card__title">{icon("ti-world-search")} Web-поиск</div>'
-        '<div class="card__meta">Для анализа компании и контактов на стадии скоринга '
-        "(self-host SearXNG).</div>"
-        '<label class="field"><span class="field__label">URL SearXNG</span>'
-        f'<input class="input" name="web_search_url" value="{escape(web_search_url)}" '
-        'placeholder="http://searxng:8080"></label>'
-        "</section>"
-    )
 
     return (
         _engine_header()
@@ -386,7 +375,6 @@ def render_engine(
         f'<div class="engine-grid">{choices}</div>'
         f"{codex_panel}{ollama_panel}"
         "</section>"
-        + web
         + '<div class="form-footer">'
         '<button type="submit" class="btn btn--accent">Сохранить</button></div>'
         "</form>"

@@ -152,7 +152,8 @@ def engine_config_from_form(
 
     Маппинг радио `engine` → конфиг: claude/codex → `scoring_engine=cli` +
     `cli_tool`; ollama → `scoring_engine=ollama`. Движок `api_key` со страницы
-    убран (доступен только ручной правкой config.json).
+    убран (доступен только ручной правкой config.json). Web-поиск не настраивается
+    в UI — работает на дефолтном SearXNG из compose.
     """
     engine = _clean(form.get("engine", "")) or "codex"
     config: dict[str, Any] = {}
@@ -172,9 +173,5 @@ def engine_config_from_form(
         if key:  # ключ Ollama Cloud — секрет, в .env, не в config.json
             secrets["OLLAMA_API_KEY"] = key
 
-    # Web-поиск — общий для скоринга (анализ компании/контакты).
-    ws_url = _clean(form.get("web_search_url", ""))
-    if ws_url:
-        config["web_search"] = {"provider": "searxng", "url": ws_url}
-
+    # Web-поиск в UI не настраивается: дефолтный SearXNG из compose (см. websearch).
     return config, secrets

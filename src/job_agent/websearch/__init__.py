@@ -38,11 +38,10 @@ def make_searcher(config: Config, *, override: Searcher | None = None) -> Search
     if override is not None:
         return override
 
+    # Секция необязательна: по умолчанию — searxng (адрес берёт из env/дефолта),
+    # чтобы web-поиск работал без ручной настройки.
     ws = config.web_search
-    if ws is None:
-        raise ConfigError("web-поиск не настроен: отсутствует секция 'web_search'")
-
-    provider = ws.provider
+    provider = ws.provider if ws is not None else "searxng"
     if provider not in KNOWN_PROVIDERS:
         known = ", ".join(KNOWN_PROVIDERS)
         raise ConfigError(

@@ -153,9 +153,9 @@ def test_make_searcher_serp() -> None:
     assert isinstance(make_searcher(cfg), SerpSearcher)
 
 
-def test_make_searcher_no_section_raises() -> None:
-    with pytest.raises(ConfigError):
-        make_searcher(_config(None))
+def test_make_searcher_no_section_defaults_searxng() -> None:
+    # Секция web_search необязательна — по умолчанию searxng на дефолтном адресе.
+    assert isinstance(make_searcher(_config(None)), SearxngSearcher)
 
 
 def test_make_searcher_unknown_provider_raises() -> None:
@@ -165,9 +165,11 @@ def test_make_searcher_unknown_provider_raises() -> None:
         make_searcher(cfg)
 
 
-def test_make_searcher_searxng_missing_url_raises() -> None:
-    with pytest.raises(ConfigError):
-        make_searcher(_config(WebSearch(provider="searxng")))
+def test_make_searcher_searxng_missing_url_uses_default(monkeypatch) -> None:
+    # Без url — дефолтный адрес SearXNG (env переопределяет), не ошибка.
+    monkeypatch.delenv("JOB_AGENT_SEARXNG_URL", raising=False)
+    searcher = make_searcher(_config(WebSearch(provider="searxng")))
+    assert isinstance(searcher, SearxngSearcher)
 
 
 def test_make_searcher_serp_missing_key_raises() -> None:

@@ -126,7 +126,6 @@ def create_app(
                 scoring_engine=se,
                 cli_tool=cfg.get("cli_tool", "codex"),
                 ollama_model=cfg.get("ollama_model", ""),
-                web_search_url=(cfg.get("web_search") or {}).get("url", ""),
                 has_ollama_key=bool(env.get("OLLAMA_API_KEY")),
             ),
             scripts='<script src="/static/js/engine.js"></script>',

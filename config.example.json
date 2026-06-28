@@ -54,12 +54,7 @@
   "use_aggregators": true,
 
   "scoring_engine": "cli",
-  "cli_tool": "claude",
-
-  "web_search": {
-    "provider": "searxng",
-    "url": "http://localhost:8080"
-  },
+  "cli_tool": "codex",
 
   "output_mode": "both",
   "backfill_days": 14,
