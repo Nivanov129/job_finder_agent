@@ -175,9 +175,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 1.11: Скоринг
-- [ ] `scoring.py`: рендерит `prompts/scoring.md` с данными трека и вакансии, зовёт движок с web-поиском, парсит и валидирует JSON в `ScoreResult`; при `multi_track_scoring` — по обоим трекам, берёт больший `overall`; устойчивость к кривому JSON.
-- [ ] Тест на фейк-движке.
-- [ ] Mark completed
+- [x] `scoring.py`: рендерит `prompts/scoring.md` с данными трека и вакансии, зовёт движок с web-поиском, парсит и валидирует JSON в `ScoreResult`; при `multi_track_scoring` — по обоим трекам, берёт больший `overall`; устойчивость к кривому JSON.
+- [x] Тест на фейк-движке.
+- [x] Mark completed
 
 ### Task 1.12: XLSX-выход
 - [ ] `output/xlsx.py`: колонки §форматов через openpyxl, сорт по overall убыв., бейджи заливкой из `presentation.py` (Task 0.4), колонка `направление` скрыта при `is_single_track`.
