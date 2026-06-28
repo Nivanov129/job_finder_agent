@@ -293,7 +293,7 @@ def create_app(
                 page(
                     render_run(),
                     scripts='<script src="/static/js/run.js"></script>',
-                    active="/results",
+                    active="/run",
                 )
             )
         return HTMLResponse(
@@ -411,7 +411,7 @@ def create_app(
         return page(
             render_run(),
             scripts='<script src="/static/js/run.js"></script>',
-            active="/results",
+            active="/run",
         )
 
     @app.get("/run/status")
