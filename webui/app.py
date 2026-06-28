@@ -21,6 +21,7 @@ from pathlib import Path
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from job_agent.config import ConfigError, load_config
 from webui.components import chip, icon, nav
@@ -127,9 +128,6 @@ def create_app(
                 ollama_url=cfg.get("api_base_url", "") if se == "ollama" else "",
                 ollama_model=cfg.get("ollama_model", ""),
                 web_search_url=(cfg.get("web_search") or {}).get("url", ""),
-                has_claude_token=bool(
-                    env.get("CLAUDE_CODE_OAUTH_TOKEN") or env.get("ANTHROPIC_API_KEY")
-                ),
                 has_ollama_key=bool(env.get("OLLAMA_API_KEY")),
             ),
             scripts='<script src="/static/js/engine.js"></script>',
@@ -156,24 +154,30 @@ def create_app(
 
     @app.post("/engine/login/start")
     async def engine_login_start(request: Request) -> JSONResponse:
-        # Сервер сам запускает claude setup-token / codex login и отдаёт ссылку
-        # для входа в браузере + режим (code — ждём код; callback — ждём браузер).
+        # Сервер сам запускает claude setup-token / codex login и отдаёт ссылку.
+        # Блокирующий запуск+чтение — в threadpool, чтобы не морозить event loop
+        # (иначе на время входа зависает весь UI).
         form = await request.form()
-        res = logins.start(str(form.get("engine", "")))
+        res = await run_in_threadpool(logins.start, str(form.get("engine", "")))
         return JSONResponse(res, status_code=200 if res.get("ok") else 400)
 
     @app.post("/engine/login/submit")
     async def engine_login_submit(request: Request) -> JSONResponse:
-        # Завершить вход: для claude — код из формы → токен в .env; для codex —
-        # пустой код, дожидаемся подтверждения в браузере (выход процесса).
+        # Завершить вход: claude — код → токен в .env; codex — ждём подтверждения
+        # в браузере. Долгое ожидание — в threadpool (UI остаётся отзывчивым).
         form = await request.form()
-        res = logins.submit(str(form.get("engine", "")), str(form.get("code", "")))
+        res = await run_in_threadpool(
+            logins.submit, str(form.get("engine", "")), str(form.get("code", ""))
+        )
         return JSONResponse(res, status_code=200 if res.get("ok") else 400)
 
     @app.post("/engine/test")
     async def engine_test(request: Request) -> JSONResponse:
+        # Реальная проба движка (subprocess/сеть) — в threadpool, не в event loop.
         form = await request.form()
-        ok, message = _probe_engine(str(form.get("engine", "")), _load_raw(target), envfile)
+        ok, message = await run_in_threadpool(
+            _probe_engine, str(form.get("engine", "")), _load_raw(target), envfile
+        )
         return JSONResponse({"ok": ok, "message": message}, status_code=200 if ok else 400)
 
     @app.post("/engine/save", response_class=HTMLResponse)

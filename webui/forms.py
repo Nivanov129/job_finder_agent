@@ -159,13 +159,10 @@ def engine_config_from_form(
     secrets: dict[str, str | None] = {}
 
     if engine in ("claude", "codex"):
+        # claude/codex авторизуются server-driven входом («Войти» → /engine/login),
+        # токен/сессия пишутся отдельно — здесь сохраняем только выбор движка.
         config["scoring_engine"] = "cli"
         config["cli_tool"] = engine
-        if engine == "claude":
-            token = _clean(form.get("claude_token", ""))
-            if token:
-                secrets["CLAUDE_CODE_OAUTH_TOKEN"] = token
-        # codex авторизуется входом ChatGPT (`codex login`) — ключа-секрета нет.
     elif engine == "ollama":
         config["scoring_engine"] = "ollama"
         model = _clean(form.get("ollama_model", ""))

@@ -367,8 +367,9 @@ def test_engine_page_shows_only_selected_panel(client: TestClient) -> None:
     assert '<div class="auth-panel" data-engine="claude">' in body
     assert '<div class="auth-panel" data-engine="codex" hidden>' in body
     assert '<div class="auth-panel" data-engine="ollama" hidden>' in body
-    # у codex больше нет поля ключа OPENAI_API_KEY
+    # у codex больше нет поля ключа OPENAI_API_KEY; у claude — ручного поля токена
     assert 'name="codex_key"' not in body
+    assert 'name="claude_token"' not in body
 
 
 def test_engine_page_has_login_buttons(client: TestClient) -> None:
@@ -483,7 +484,7 @@ def test_engine_page_ollama_has_copy_steps(client: TestClient) -> None:
 def test_engine_save_triggers_autoverify(tmp_path: Path) -> None:
     client = TestClient(create_app(config_path=tmp_path / "config.json"))
     _seed_config(client)
-    r = client.post("/engine/save", data={"engine": "claude", "claude_token": "tok"})
+    r = client.post("/engine/save", data={"engine": "claude"})
     assert r.status_code == 200
     # страница-подтверждение сама гоняет «Проверить» для сохранённого движка
     assert 'data-autoverify="claude"' in r.text

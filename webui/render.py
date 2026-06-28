@@ -303,7 +303,6 @@ def render_engine(
     ollama_url: str = "",
     ollama_model: str = "",
     web_search_url: str = "",
-    has_claude_token: bool = False,
     has_ollama_key: bool = False,
 ) -> str:
     """Экран «AI · авторизация»: выбор движка, статус, авторизация, web-поиск.
@@ -339,11 +338,8 @@ def render_engine(
         "Вход в один клик: сервер запустит <code>claude setup-token</code>, покажет "
         "ссылку для входа — вы авторизуетесь в браузере, вставите код, и токен "
         "сохранится автоматически (живёт ~1 год)."
-        + _login_widget("claude")
-        + '<div class="auth-panel__sub">Или вставьте токен вручную '
-        "(если запускали <code>claude setup-token</code> сами):</div>",
-        secret_field("claude_token", "CLAUDE_CODE_OAUTH_TOKEN", "вставьте токен",
-                     has=has_claude_token),
+        + _login_widget("claude"),
+        "",  # ручного поля токена нет — только вход через браузер
         visible=active == "claude",
     )
     codex_panel = _auth_panel(
