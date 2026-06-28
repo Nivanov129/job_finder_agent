@@ -353,7 +353,13 @@ def _probe_engine(engine_key: str, cfg: dict, envfile: Path) -> tuple[bool, str]
 
             def runner(argv: list[str]) -> str:
                 return subprocess.run(
-                    argv, capture_output=True, text=True, timeout=60, env=env, check=True
+                    argv,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    env=env,
+                    check=True,
+                    stdin=subprocess.DEVNULL,  # codex иначе ждёт ввод из stdin
                 ).stdout
 
             out = CliEngine(engine_key, runner=runner).complete(prompt)

@@ -47,7 +47,26 @@ def _config(engine: str, **kw: object) -> Config:
 
 def test_cli_build_argv_per_tool() -> None:
     assert build_argv("claude", "P") == ["claude", "-p", "P"]
-    assert build_argv("codex", "P") == ["codex", "exec", "P"]
+    # codex: вне git-репо + без цвета; чистый ответ — в файл --output-last-message
+    assert build_argv("codex", "P") == [
+        "codex", "exec", "--skip-git-repo-check", "--color", "never", "P",
+    ]
+    assert build_argv("codex", "P", output_file="/tmp/o.txt") == [
+        "codex", "exec", "--skip-git-repo-check", "--color", "never",
+        "--output-last-message", "/tmp/o.txt", "P",
+    ]
+
+
+def test_codex_complete_reads_output_file() -> None:
+    # codex: чистый ответ берётся из файла --output-last-message, не из stdout
+    # (stdout = баннер + эхо промта со скобками схемы).
+    def runner(argv: list[str]) -> str:
+        path = argv[argv.index("--output-last-message") + 1]
+        with open(path, "w", encoding="utf-8") as f:
+            f.write('[{"title": "X"}]\n')
+        return "OpenAI Codex banner\nuser\n[schema]\ncodex\nignored\ntokens used\n42"
+
+    assert CliEngine("codex", runner=runner).complete("p") == '[{"title": "X"}]'
 
 
 def test_cli_build_argv_unknown_tool_raises() -> None:
