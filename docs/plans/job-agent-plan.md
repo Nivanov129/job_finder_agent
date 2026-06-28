@@ -219,9 +219,9 @@ job-agent/
 - [x] Mark completed
 
 ### Task 3.3: Включение обогащения в пайплайн
-- [ ] `pipeline.py`: после скоринга для финалистов выше порога — cover; при `enable_contacts` — contacts; результаты в оба выхлопа.
-- [ ] End-to-end тест с обогащением на фейках.
-- [ ] Mark completed
+- [x] `pipeline.py`: после скоринга для финалистов выше порога — cover; при `enable_contacts` — contacts; результаты в оба выхлопа.
+- [x] End-to-end тест с обогащением на фейках.
+- [x] Mark completed
 
 ## Фаза 4 — Упаковка и инсталлер (милстоун 4)
 

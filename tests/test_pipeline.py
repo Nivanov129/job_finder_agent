@@ -22,6 +22,7 @@ from job_agent.engines.base import Engine
 from job_agent.models import RawPost
 from job_agent.output.xlsx import COLUMNS
 from job_agent.pipeline import build_collectors, run_backfill, run_nightly, run_pipeline
+from job_agent.websearch.base import Searcher, SearchResult
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FAR_PAST = datetime(2000, 1, 1, tzinfo=UTC)
@@ -339,3 +340,149 @@ def test_run_backfill_collects_recent(tmp_path) -> None:
     )
     assert result.collected == 1
     assert result.written == 1
+
+
+class EnrichStubEngine(Engine):
+    """Движок-заглушка с маршрутизацией по типу промта (нормализация/скоринг/обогащение).
+
+    Скоринг — единственный вызов с `web_search=True`. Остальные (`web_search=False`)
+    различаются по заголовку отрендеренного промта: нормализация, сопроводительное,
+    контакт-поиск.
+    """
+
+    def __init__(self, track_name: str, *, overall: int) -> None:
+        self.track_name = track_name
+        self.overall = overall
+        self.normalize_calls = 0
+
+    def complete(self, prompt: str, *, web_search: bool = False) -> str:
+        if web_search:
+            return _score_json(track=self.track_name, overall=self.overall)
+        if "Промт сопроводительного" in prompt:
+            return "Здравствуйте! Подходящий кандидат под вашу вакансию."
+        if "Промт контакт-поиска" in prompt:
+            return json.dumps(
+                {
+                    "target_roles": ["Hiring Manager"],
+                    "queries_used": ["site:linkedin.com Acme"],
+                    "candidates": [
+                        {"name": "Иван Рекрутёров", "role": "HR", "confidence": "medium"}
+                    ],
+                    "fallback_paths": ["HR на сайте"],
+                    "draft_message": "Здравствуйте, увидел вакансию...",
+                }
+            )
+        self.normalize_calls += 1
+        n = self.normalize_calls
+        return json.dumps(
+            [
+                {
+                    "title": f"Product Manager {n}",
+                    "company": f"Acme {n}",
+                    "link_or_contact": "@hr",
+                    "salary": "300к",
+                    "description": "продуктовая роль, владение метриками",
+                }
+            ]
+        )
+
+
+class FakeSearcher(Searcher):
+    """Фейк web-поиска: фиксированная выдача без сети."""
+
+    def search(self, query: str, *, max_results: int = 5) -> list[SearchResult]:
+        return [SearchResult(title="Acme careers", url="https://acme.example/jobs")]
+
+
+def _enrich_config(tmp_path: Path) -> Config:
+    resume = tmp_path / "resume.md"
+    resume.write_text("Продакт-менеджер, владение метриками, mobile", encoding="utf-8")
+    cover = tmp_path / "cover.md"
+    cover.write_text("Здравствуйте, меня зовут {{name}}.", encoding="utf-8")
+    data = {
+        "version": 1,
+        "tracks": [
+            {
+                "id": "main",
+                "name": "Основной",
+                "resume_path": "resume.md",
+                "cover_template_path": "cover.md",
+            }
+        ],
+        "scoring_engine": "cli",
+        "cli_tool": "claude",
+        "output_mode": "table",
+        "tg_channels": [{"handle": "forhirejobs", "private": False}],
+        "use_aggregators": True,
+        "cover_letter_threshold": 70,
+        "enable_contacts": True,
+    }
+    return Config.model_validate(data)
+
+
+def test_enrichment_populates_cover_and_contacts(tmp_path) -> None:
+    """Финалисты выше порога получают сопроводительное; при enable_contacts — контакты."""
+    config = _enrich_config(tmp_path)
+    engine = EnrichStubEngine(config.tracks[0].name, overall=80)
+
+    result = run_pipeline(
+        config,
+        since=FAR_PAST,
+        base_dir=tmp_path,
+        engine=engine,
+        embedder=_embedder(),
+        collectors=_collectors(config),
+        seen_store=SeenStore(":memory:"),
+        searcher=FakeSearcher(),
+    )
+
+    assert result.written > 0
+    for res in result.results:
+        assert res.cover_letter == "Здравствуйте! Подходящий кандидат под вашу вакансию."
+        assert res.contacts is not None
+        assert res.contacts.candidates[0].name == "Иван Рекрутёров"
+
+
+def test_enrichment_below_threshold_skips_cover(tmp_path) -> None:
+    """Ниже порога сопроводительное не готовится (cover_letter=None)."""
+    config = _enrich_config(tmp_path)
+    engine = EnrichStubEngine(config.tracks[0].name, overall=50)
+
+    result = run_pipeline(
+        config,
+        since=FAR_PAST,
+        base_dir=tmp_path,
+        engine=engine,
+        embedder=_embedder(),
+        collectors=_collectors(config),
+        seen_store=SeenStore(":memory:"),
+        searcher=FakeSearcher(),
+    )
+
+    assert result.written > 0
+    for res in result.results:
+        assert res.cover_letter is None
+        # контакты не зависят от порога сопроводительного
+        assert res.contacts is not None
+
+
+def test_contacts_disabled_yields_none(tmp_path) -> None:
+    """Без enable_contacts контакт-ассист не запускается (и searcher не нужен)."""
+    config = _enrich_config(tmp_path)
+    config = config.model_copy(update={"enable_contacts": False})
+    engine = EnrichStubEngine(config.tracks[0].name, overall=80)
+
+    result = run_pipeline(
+        config,
+        since=FAR_PAST,
+        base_dir=tmp_path,
+        engine=engine,
+        embedder=_embedder(),
+        collectors=_collectors(config),
+        seen_store=SeenStore(":memory:"),
+    )
+
+    assert result.written > 0
+    for res in result.results:
+        assert res.cover_letter is not None
+        assert res.contacts is None

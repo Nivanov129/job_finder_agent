@@ -29,16 +29,21 @@ from .dedup import SeenStore
 from .embeddings import Embedder
 from .engines import make_engine
 from .engines.base import Engine
+from .enrich.contacts import find_contacts
+from .enrich.cover import write_cover_letter
 from .models import EnrichedResult
 from .normalize import normalize_posts
 from .output.xlsx import write_xlsx
 from .prefilter import DEFAULT_LIMIT, DEFAULT_MIN_SIM, MapExample, prefilter_and_route
 from .scoring import score_routed
+from .websearch import make_searcher
+from .websearch.base import Searcher
 
 __all__ = [
     "RunResult",
     "build_collectors",
     "load_track_resumes",
+    "load_cover_templates",
     "map_examples",
     "run_pipeline",
     "run_backfill",
@@ -78,6 +83,21 @@ def load_track_resumes(config: Config, base_dir: Path) -> dict[str, str]:
     for track in config.tracks:
         resumes[track.id] = _read_text(track.resume_path, base_dir)
     return resumes
+
+
+def load_cover_templates(config: Config, base_dir: Path) -> dict[str, str | None]:
+    """id трека → текст шаблона сопроводительного (или `None`, если не задан).
+
+    Шаблон опционален: трек без `cover_template_path` → `None`, и тогда
+    сопроводительное для него не готовится (см. гейт в `enrich/cover.py`).
+    """
+    templates: dict[str, str | None] = {}
+    for track in config.tracks:
+        if track.cover_template_path:
+            templates[track.id] = _read_text(track.cover_template_path, base_dir)
+        else:
+            templates[track.id] = None
+    return templates
 
 
 def map_examples(config: Config, base_dir: Path) -> list[MapExample]:
@@ -146,6 +166,7 @@ def run_pipeline(
     embedder: Embedder | None = None,
     collectors: Sequence[Collector] | None = None,
     seen_store: SeenStore | None = None,
+    searcher: Searcher | None = None,
     min_sim: float = DEFAULT_MIN_SIM,
     limit: int = DEFAULT_LIMIT,
 ) -> RunResult:
@@ -196,6 +217,15 @@ def run_pipeline(
 
         # 5. Скоринг финалистов.
         tracks_by_id = {t.id: t for t in config.tracks}
+        # `score.track` несёт имя направления ({{track_name}} из промта), не id —
+        # резолвим трек по имени с откатом на `best_track` из роутинга.
+        tracks_by_name = {t.name: t for t in config.tracks}
+        cover_templates = load_cover_templates(config, base)
+        # Web-поиск для контактов строим лениво и только при включённой стадии.
+        contact_searcher = searcher
+        if config.enable_contacts and contact_searcher is None:
+            contact_searcher = make_searcher(config)
+
         results: list[EnrichedResult] = []
         for rv in routed:
             score = score_routed(
@@ -210,7 +240,39 @@ def run_pipeline(
             )
             if score is None:
                 continue
-            results.append(EnrichedResult(vacancy=rv.vacancy, score=score))
+
+            # 6. Обогащение финалистов: сопроводительное (гейт по порогу + шаблон)
+            #    и опц. контакт-ассист (только при enable_contacts).
+            track = tracks_by_name.get(score.track) or tracks_by_id.get(rv.best_track)
+            track_id = track.id if track is not None else rv.best_track
+            cover_letter = write_cover_letter(
+                score,
+                rv.vacancy,
+                engine,
+                cover_template=cover_templates.get(track_id),
+                track_resume=track_resumes.get(track_id, ""),
+                threshold=config.cover_letter_threshold,
+                output_lang=config.output_lang,
+            )
+            contacts = None
+            if config.enable_contacts and contact_searcher is not None:
+                contacts = find_contacts(
+                    rv.vacancy,
+                    engine,
+                    contact_searcher,
+                    track_name=track.name if track is not None else score.track,
+                    enable_contacts=True,
+                    output_lang=config.output_lang,
+                )
+
+            results.append(
+                EnrichedResult(
+                    vacancy=rv.vacancy,
+                    score=score,
+                    cover_letter=cover_letter,
+                    contacts=contacts,
+                )
+            )
 
         # 7. Выход (.xlsx).
         out_path: Path | None = None
