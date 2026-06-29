@@ -90,13 +90,25 @@ if (Test-Path $ConfigPath) {
 $ComposeExe = $Compose[0]
 $ComposeArgs = @($Compose[1..($Compose.Length - 1)])
 
+# Повтор шага при временном сбое сети/реестра Docker (pull образа с EOF и т.п.).
+function Invoke-Retry {
+  param([int]$Tries, [int]$Pause, [scriptblock]$Action)
+  for ($i = 1; $i -le $Tries; $i++) {
+    & $Action
+    if ($LASTEXITCODE -eq 0) { return }
+    if ($i -lt $Tries) {
+      Write-Warn "Не вышло с попытки $i/$Tries (часто временный сбой сети/реестра Docker) — повтор через $Pause с…"
+      Start-Sleep -Seconds $Pause
+    }
+  }
+  throw "Шаг не удался после $Tries попыток. Проверь интернет и запусти снова."
+}
+
 Write-Info "Собираю образы (первый раз тянет базовые слои — это нормально долго)…"
-& $ComposeExe @ComposeArgs build
-if ($LASTEXITCODE -ne 0) { throw "compose build вернул $LASTEXITCODE" }
+Invoke-Retry -Tries 3 -Pause 8 -Action { & $ComposeExe @ComposeArgs build }
 
 Write-Info "Поднимаю стек (пайплайн + SearXNG + прогрев модели эмбеддингов)…"
-& $ComposeExe @ComposeArgs up -d
-if ($LASTEXITCODE -ne 0) { throw "compose up вернул $LASTEXITCODE" }
+Invoke-Retry -Tries 5 -Pause 6 -Action { & $ComposeExe @ComposeArgs up -d }
 
 # --- 4. Открыть веб-интерфейс ----------------------------------------------
 # Настройка, подбор и подборка — в web-UI (config.json можно править и руками).
