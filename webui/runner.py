@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 from collections.abc import Callable
@@ -270,14 +271,33 @@ def _default_run(  # pragma: no cover - пайплайн
         since = now - timedelta(days=config.backfill_days)
 
     out = base / "backfill.xlsx"
+    # В агент-режиме копим финалистов (EnrichedResult), чтобы после прогона
+    # отправить НОВЫЕ вакансии в Telegram-бот владельца. Для разового «Подбора»
+    # бот не шлём (результаты и так в UI) — копить незачем.
+    finalists: list[Any] = []
+
+    def _on_result_er(er: Any) -> None:
+        if agent_mode:
+            finalists.append(er)
+        on_result(result_to_dict(er))
+
     result = run_pipeline(
         config, since=since, base_dir=base, output_path=out,
         seen_store=seen_store,
         on_progress=on_progress,
-        on_result=lambda er: on_result(result_to_dict(er)),
+        on_result=_on_result_er,
         on_item=on_item,
     )
     write_last_run(last_run_file, now)
+    if agent_mode and finalists:
+        try:
+            from .notify import notify_new_vacancies
+
+            notify_new_vacancies(config, finalists)
+        except Exception as exc:  # бот-уведомление не должно валить прогон
+            logging.getLogger("job_agent.webui.runner").warning(
+                "Бот-уведомление пропущено: %s", str(exc)[:160]
+            )
     return {
         "collected": result.collected,
         "after_filter": result.after_filter,

@@ -160,6 +160,7 @@
       "description": "Язык выхлопа (таблица, карточки, сопроводительное)."
     },
     "bot_token": { "type": "string", "description": "Если output_mode включает bot. Секрет." },
+    "owner_chat_id": { "type": ["integer", "string"], "description": "Личный chat_id владельца для бот-уведомлений о новых вакансиях (ловится через getUpdates). Токен бота — в .env (TELEGRAM_BOT_TOKEN)." },
     "telethon_creds": {
       "type": "object",
       "description": "Если есть приватные каналы.",

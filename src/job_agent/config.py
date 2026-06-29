@@ -112,6 +112,10 @@ class Config(BaseModel):
     cover_letter_threshold: int = 70
     output_lang: str = "ru"
     bot_token: str | None = None
+    # Личный чат владельца для бот-уведомлений (новые вакансии в фоне). Токен
+    # бота — секрет, живёт в `.env` (TELEGRAM_BOT_TOKEN), а сюда пишем chat_id
+    # (не секрет), пойманный через getUpdates. None — уведомления выключены.
+    owner_chat_id: int | str | None = None
     telethon_creds: TelethonCreds | None = None
     enable_contacts: bool = False
     # Доп-движок контактов (инвестигатор): расследование контактов с confidence/

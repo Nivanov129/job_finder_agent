@@ -451,11 +451,47 @@ def render_engine(
     )
 
 
+def _bot_notify_card(has_bot_token: bool, owner_chat_id: int | str | None) -> str:
+    """Карточка «Бот для уведомлений»: токен от @BotFather → Подключить → тест."""
+    token_note = ' <span class="hint-set">задан ✓</span>' if has_bot_token else ""
+    if owner_chat_id:
+        status = (
+            '<span class="hint-set">подключено ✓ chat '
+            f"{escape(str(owner_chat_id))}</span>"
+        )
+    else:
+        status = '<span class="card__meta">пока не подключён</span>'
+    return (
+        '<section class="card"><div class="card__title">'
+        f'{icon("ti-robot")} Бот для уведомлений '
+        f"{status}</div>"
+        '<div class="card__meta">Получай <b>новые вакансии</b> в Telegram, пока агент '
+        "работает в фоне. Один раз: 1) у <a href=\"https://t.me/BotFather\" "
+        'target="_blank" rel="noopener">@BotFather</a> команда <code>/newbot</code> → '
+        "скопируй токен; 2) вставь токен ниже; 3) <b>открой своего бота и нажми "
+        'Start</b>; 4) нажми «Подключить».</div>'
+        f'<label class="field"><span class="field__label">Токен бота{token_note}'
+        "</span>"
+        '<input class="input" type="password" name="bot_token" '
+        'placeholder="123456789:AA... от @BotFather"></label>'
+        '<div class="btn-row">'
+        '<button type="button" class="btn btn--accent" data-bot-connect>'
+        f'{icon("ti-plug")} Подключить</button>'
+        '<button type="button" class="btn" data-bot-test>'
+        f'{icon("ti-send")} Отправить тест</button>'
+        "</div>"
+        '<div class="login-flow__out" data-bot-out></div>'
+        "</section>"
+    )
+
+
 def render_telegram(
     *,
     has_session: bool = False,
     saved: list[str] | None = None,
     has_api_creds: bool = False,
+    has_bot_token: bool = False,
+    owner_chat_id: int | str | None = None,
 ) -> str:
     """Экран «Telegram»: свои api_id/api_hash (my.telegram.org) → телефон → код →
     2FA, затем выгрузка каналов с авто-подбором. Поток ведёт telegram.js.
@@ -578,7 +614,7 @@ def render_telegram(
         'class="btn btn--accent tg-save" hidden>Сохранить выбранные</button></div>'
         "</section>"
     )
-    return login + channels
+    return login + channels + _bot_notify_card(has_bot_token, owner_chat_id)
 
 
 def render_results_screen() -> str:

@@ -529,10 +529,59 @@ def create_app(
                 has_api_creds=bool(
                     env.get("TELEGRAM_API_ID") and env.get("TELEGRAM_API_HASH")
                 ),
+                has_bot_token=bool(env.get("TELEGRAM_BOT_TOKEN")),
+                owner_chat_id=cfg.get("owner_chat_id"),
             ),
-            scripts='<script src="/static/js/telegram.js?v=qr1"></script>',
+            scripts=(
+                '<script src="/static/js/telegram.js?v=qr1"></script>'
+                '<script src="/static/js/bot.js"></script>'
+            ),
             active="/telegram",
         )
+
+    @app.post("/telegram/bot/connect")
+    async def telegram_bot_connect(request: Request) -> JSONResponse:
+        # Подключить бот-уведомления: токен (от @BotFather) → .env, затем ловим
+        # chat_id владельца через getUpdates (он должен был нажать Start у бота).
+        from webui.bot_connect import BOT_TOKEN_ENV, resolve_owner_chat_id
+
+        form = await request.form()
+        token = str(form.get("bot_token", "")).strip()
+        if token:
+            merge_env(envfile, {BOT_TOKEN_ENV: token})
+        os.environ.update(parse_env(envfile))
+        token = os.environ.get(BOT_TOKEN_ENV, "")
+        if not token:
+            return JSONResponse(
+                {"ok": False, "error": "вставь токен бота от @BotFather"}, status_code=400
+            )
+        chat_id = await run_in_threadpool(resolve_owner_chat_id, token)
+        if chat_id is None:
+            return JSONResponse(
+                {"ok": False, "error": "не вижу сообщений боту. Открой своего бота в "
+                 "Telegram, нажми Start (или напиши /start), затем «Подключить» снова."},
+                status_code=400,
+            )
+        _merge_and_validate({"owner_chat_id": chat_id}, target)
+        return JSONResponse({"ok": True, "chat_id": chat_id})
+
+    @app.post("/telegram/bot/test")
+    async def telegram_bot_test(request: Request) -> JSONResponse:
+        # Отправить тест-сообщение в личный чат владельца (проверка связи).
+        from webui.bot_connect import BOT_TOKEN_ENV, send_test_message
+
+        os.environ.update(parse_env(envfile))
+        token = os.environ.get(BOT_TOKEN_ENV, "")
+        chat_id = _load_raw(target).get("owner_chat_id")
+        if not token or not chat_id:
+            return JSONResponse(
+                {"ok": False, "error": "сначала подключи бота"}, status_code=400
+            )
+        ok = await run_in_threadpool(
+            send_test_message, token, chat_id,
+            "Job Agent на связи ✅ Сюда буду присылать новые вакансии, пока агент работает.",
+        )
+        return JSONResponse({"ok": ok}, status_code=200 if ok else 502)
 
     def _resolve_tg_creds(form: Any) -> tuple[str, str]:
         """api_id/api_hash из формы (если введены) либо из .env; введённые
