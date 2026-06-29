@@ -74,6 +74,21 @@ def _fetch_url_text(url: str, *, timeout: float = 20.0) -> str:
     text = re.sub(r"(?s)<[^>]+>", " ", html)
     return re.sub(r"\s+", " ", text).strip()
 
+
+def _fetch_vacancy_text(url: str) -> str:
+    """Текст вакансии по ссылке для «Поиска контактов».
+
+    Для hh.* сначала пробуем официальный API (HTML hh — за анти-ботом/JS), иначе
+    и при неудаче — обычная загрузка страницы (`_fetch_url_text`). Так hh-ссылки
+    начинают работать там, где доступен `api.hh.ru`, не ломая прочие агрегаторы.
+    """
+    from webui.hh import fetch_hh_vacancy_text
+
+    hh_text = fetch_hh_vacancy_text(url)
+    if hh_text:
+        return hh_text
+    return _fetch_url_text(url)
+
 #: Потолок размера загрузки (UI бывает открыт в LAN — без авторизации).
 _MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
@@ -258,11 +273,14 @@ def create_app(
                     if path:
                         text = _read_document(path, base)
                     else:
-                        text = _fetch_url_text(link)
+                        text = _fetch_vacancy_text(link)
                 except Exception as exc:
                     return {"error": f"не прочитать вакансию: {str(exc)[:160]}"}
                 if not text.strip():
-                    return {"error": "пусто — со страницы не вытащить текст, загрузи PDF"}
+                    return {
+                        "error": "пусто — со страницы не вытащить текст. Для hh.ru "
+                        "сохрани вакансию в PDF или впиши роль и компанию вручную."
+                    }
                 # 2) достаём должность+компанию нормализацией
                 post = RawPost(raw_text=text[:8000], source="manual", url=link or None)
                 vacs = normalize_post(post, engine, output_lang=cfg.output_lang)
