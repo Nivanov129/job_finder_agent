@@ -35,7 +35,9 @@ class FakeSearcher(Searcher):
     "raw, expected",
     [
         ("career.ozon.ru", "career.ozon.ru"),
-        ("https://career.ozon.ru/vacancies", "career.ozon.ru"),
+        ("https://career.ozon.ru/", "career.ozon.ru"),  # хвостовой / срезан
+        ("https://yandex.ru/jobs", "yandex.ru/jobs"),  # путь раздела сохранён
+        ("https://www.tbank.ru/career/", "tbank.ru/career"),  # www убран, путь есть
         ("www.jobs.yandex.ru", "jobs.yandex.ru"),
         ("  HH.RU/  ", "hh.ru"),
         ("", ""),
@@ -46,8 +48,8 @@ def test_normalize_site(raw: str, expected: str) -> None:
 
 
 def test_build_query_quotes_role_and_ors_sites() -> None:
-    q = build_query("Product Manager", ["career.ozon.ru", "jobs.yandex.ru"])
-    assert q == '"Product Manager" (site:career.ozon.ru/ OR site:jobs.yandex.ru/)'
+    q = build_query("Product Manager", ["career.ozon.ru", "yandex.ru/jobs"])
+    assert q == '"Product Manager" (site:career.ozon.ru OR site:yandex.ru/jobs)'
 
 
 def test_build_query_without_sites_is_just_role() -> None:
@@ -72,7 +74,7 @@ def test_fetch_builds_posts_and_dedupes_by_url() -> None:
     assert all(p.source == "career_site" for p in posts)
     assert "PM в Ozon" in posts[0].raw_text
     # дорк ушёл с доменом и ролью
-    assert searcher.queries == ['"Product Manager" (site:career.ozon.ru/)']
+    assert searcher.queries == ['"Product Manager" (site:career.ozon.ru)']
 
 
 def test_fetch_drops_site_root_results() -> None:

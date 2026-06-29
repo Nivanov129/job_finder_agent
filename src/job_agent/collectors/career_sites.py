@@ -4,7 +4,7 @@
 роли берём из резюме (`role_gate` — те же «Допустимые роли»). По каждой роли
 гоняем дорк через настроенный `Searcher` (SearXNG), ограничив выдачу доменами:
 
-    "<роль>" (site:career.ozon.ru/ OR site:jobs.yandex.ru/)
+    "<роль>" (site:career.ozon.ru OR site:yandex.ru/jobs)
 
 Выдача (title + snippet) превращается в `RawPost` — дальше обычный пайплайн
 (нормализация → пред-фильтр эмбеддингами → AI-скоринг), который и делает
@@ -31,22 +31,35 @@ _logger = logging.getLogger("job_agent.collectors.career_sites")
 
 
 def normalize_site(raw: str) -> str:
-    """Привести ввод к голому домену: убрать схему, `www.`, путь, пробелы.
+    """Привести ввод к `домен[/путь]`: убрать схему, `www.`, хвостовой `/`, пробелы.
 
-    `https://career.ozon.ru/vacancies` → `career.ozon.ru`; пустое/мусор → ``.
+    Путь СОХРАНЯЕМ — иначе для карьерных разделов под общим доменом
+    (`yandex.ru/jobs`, `tbank.ru/career`) дорк `site:` шерстил бы весь домен
+    (почту/банк/поиск), а не вакансии. `https://career.ozon.ru/` → `career.ozon.ru`;
+    `https://yandex.ru/jobs` → `yandex.ru/jobs`; пустое/мусор → ``.
     """
-    s = (raw or "").strip().strip("/")
+    s = (raw or "").strip()
     if not s:
         return ""
     if "://" not in s:
         s = "https://" + s
-    host = (urlparse(s).hostname or "").strip().lower()
-    return host[4:] if host.startswith("www.") else host
+    parsed = urlparse(s)
+    host = (parsed.hostname or "").strip().lower()
+    if host.startswith("www."):
+        host = host[4:]
+    if not host:
+        return ""
+    path = (parsed.path or "").rstrip("/")
+    return host + path
 
 
 def build_query(role: str, sites: Sequence[str]) -> str:
-    """Дорк под одну роль и список доменов: `"<роль>" (site:a/ OR site:b/)`."""
-    group = " OR ".join(f"site:{d}/" for d in sites if d)
+    """Дорк под одну роль и список доменов/путей: `"<роль>" (site:a OR site:b)`.
+
+    Без хвостового `/` — чтобы `site:yandex.ru/jobs` ловил и `/jobs`, и
+    `/jobs/vacancy/…` (со слешем срезало бы страницу-корень раздела).
+    """
+    group = " OR ".join(f"site:{d}" for d in sites if d)
     role = role.strip()
     if not group:
         return f'"{role}"'
