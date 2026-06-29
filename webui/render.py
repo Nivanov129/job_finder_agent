@@ -608,6 +608,10 @@ def render_run(agent_interval: int = 30, days: int = 7) -> str:
         'data-run-ptitle>Прогон…</div><div class="run-progress__sub" data-run-psub>'
         "</div></div><div class=\"run-progress__bar\"><div data-run-pbar></div></div>"
         '<div class="run-progress__pct mono" data-run-ppct></div></section>'
+        '<section class="card run-feed"><div class="run-feed__head">'
+        '<span class="orb orb--on"></span>'
+        '<span class="card__title">Лента · что AI читает прямо сейчас</span></div>'
+        '<div class="run-feed__list" data-run-feed></div></section>'
         '<div class="res-grid" data-res-grid></div></div>'
     )
     return banner + idle + active

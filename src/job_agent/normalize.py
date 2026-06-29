@@ -133,18 +133,18 @@ def normalize_posts(
     *,
     output_lang: str = "ru",
     workers: int = 1,
-    on_each: Callable[[], None] | None = None,
+    on_each: Callable[[RawPost, list[Vacancy]], None] | None = None,
 ) -> list[Vacancy]:
     """Нормализовать набор постов; вакансии всех постов в одном списке.
 
     `workers > 1` — параллельные AI-вызовы (порядок сохраняется). Каждый пост
-    изолирован: его сбой не валит остальные. `on_each` зовётся по завершении
-    каждого поста (для прогресса).
+    изолирован: его сбой не валит остальные. `on_each(post, vacancies)` зовётся по
+    завершении каждого поста (прогресс + живая лента того, что прочитал AI).
     """
     def run(post: RawPost) -> list[Vacancy]:
         result = _safe_normalize(post, engine, output_lang)
         if on_each is not None:
-            on_each()
+            on_each(post, result)
         return result
 
     out: list[Vacancy] = []

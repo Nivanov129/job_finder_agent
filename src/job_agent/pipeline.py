@@ -231,6 +231,7 @@ def run_pipeline(
     limit: int = DEFAULT_LIMIT,
     on_progress: Callable[[str, dict[str, int]], None] | None = None,
     on_result: Callable[[EnrichedResult], None] | None = None,
+    on_item: Callable[[dict], None] | None = None,
 ) -> RunResult:
     """Прогнать стадии 1–5 + xlsx за один проход.
 
@@ -250,6 +251,19 @@ def run_pipeline(
             try:
                 on_progress(stage, counts)
             except Exception:  # pragma: no cover - прогресс не роняет прогон
+                pass
+
+    def _emit(phase: str, title: str, company: str | None, src: str | None) -> None:
+        """Живая лента: что AI читает/оценивает прямо сейчас (реальные посты)."""
+        if on_item is not None:
+            try:
+                on_item({
+                    "phase": phase,
+                    "role": title,
+                    "company": company or "",
+                    "src": src or "",
+                })
+            except Exception:  # pragma: no cover - лента не роняет прогон
                 pass
 
     own_store = seen_store is None
@@ -302,12 +316,15 @@ def run_pipeline(
         # 2. Нормализация (параллельно, изоляция по посту).
         done = {"n": 0}
 
-        def _tick() -> None:
+        def _tick(post: RawPost, vacs: list) -> None:
             done["n"] += 1
             _report(
                 "normalize", collected=collected,
                 to_normalize=to_normalize, normalized=done["n"],
             )
+            # Живая лента: реальные вакансии, которые AI только что вычитал из поста.
+            for vac in vacs:
+                _emit("read", vac.title, vac.company, vac.source or post.source)
 
         vacancies = normalize_posts(
             posts,
@@ -351,6 +368,8 @@ def run_pipeline(
         scored = {"n": 0}
 
         def _score_one(rv) -> EnrichedResult | None:
+            # Лента: показываем, какую вакансию AI сейчас оценивает (два процента).
+            _emit("score", rv.vacancy.title, rv.vacancy.company, rv.vacancy.source)
             score = score_routed(
                 rv,
                 tracks_by_id,

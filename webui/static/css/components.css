@@ -869,3 +869,19 @@ textarea.input {
 .run-progress__bar { width: 140px; height: 6px; background: #EEECE4; border-radius: 3px; overflow: hidden; flex: none; }
 .run-progress__bar > div { height: 100%; background: var(--fill-accent); border-radius: 3px; width: 0; transition: width .4s; }
 .run-progress__pct { font-size: 11px; color: var(--text-secondary); width: 36px; text-align: right; flex: none; }
+
+/* живая лента прогона: реальные посты, которые AI читает/оценивает */
+.run-feed { margin-top: 12px; padding: 6px 8px; }
+.run-feed__head { display: flex; align-items: center; gap: 8px; padding: 8px 8px 6px; }
+.run-feed__list { display: flex; flex-direction: column; }
+.run-feed__row { display: flex; align-items: flex-start; gap: 11px; padding: 9px; border-radius: 10px; animation: ja-in .3s ease; }
+.run-feed__row + .run-feed__row { border-top: 0.5px solid rgba(0,0,0,.05); }
+.run-feed__row--fresh { background: var(--surface-sub); box-shadow: inset 2px 0 0 var(--fill-accent); }
+.run-feed__ic { width: 30px; height: 30px; border-radius: 8px; flex: none; display: flex; align-items: center; justify-content: center; background: var(--band-grey-bg); color: var(--text-secondary); font-size: 15px; }
+.run-feed__main { flex: 1; min-width: 0; }
+.run-feed__role { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-feed__meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-feed__live { display: flex; align-items: center; gap: 8px; margin-top: 7px; font-size: 11.5px; color: var(--text-accent); animation: ja-fade 1.1s infinite; }
+.run-feed__done { display: flex; align-items: center; gap: 5px; margin-top: 7px; font-size: 11px; color: var(--text-muted); }
+.run-feed__done .ti { font-size: 13px; color: var(--text-success); }
+.run-feed__empty { font-size: 12.5px; color: var(--text-muted); padding: 20px 10px; text-align: center; }

@@ -3,6 +3,11 @@
 (function () {
   "use strict";
   function $(s) { return document.querySelector(s); }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
   var idle = $("[data-run-idle]");
   var active = $("[data-run-active]");
   if (!idle || !active) return;
@@ -68,12 +73,47 @@
     if (pic) pic.innerHTML = '<i class="ti ' + (s.status === "done" ? "ti-circle-check" : s.status === "error" ? "ti-alert-triangle" : "ti-loader") + '"></i>';
   }
 
+  function feedRow(it, fresh, running) {
+    var src = it.src ? esc(it.src) : "";
+    var scoring = it.phase === "score";
+    var line;
+    if (fresh && running) {
+      line = '<div class="run-feed__live"><span class="spin"></span>' +
+        (scoring ? "считаю совпадение · два процента…" : "AI читает пост…") + "</div>";
+    } else {
+      line = '<div class="run-feed__done"><i class="ti ti-check"></i>' +
+        (scoring ? "оценено" : "прочитано") + "</div>";
+    }
+    return (
+      '<div class="run-feed__row' + (fresh && running ? " run-feed__row--fresh" : "") + '">' +
+      '<i class="ti ' + (scoring ? "ti-target" : "ti-file-text") + ' run-feed__ic"></i>' +
+      '<div class="run-feed__main"><div class="run-feed__role">' + esc(it.role) + "</div>" +
+      '<div class="run-feed__meta">' + esc(it.company || "") +
+      (src ? " · " + src : "") + "</div>" + line + "</div></div>"
+    );
+  }
+
+  function paintFeed(s) {
+    var el = $("[data-run-feed]");
+    if (!el) return;
+    var feed = s.feed || [];
+    var running = s.status === "running";
+    if (!feed.length) {
+      el.innerHTML = '<div class="run-feed__empty">' +
+        (running ? "Жду первые посты из каналов…" : "Лента пуста.") + "</div>";
+      return;
+    }
+    el.innerHTML = feed.slice(0, 8).map(function (it, i) {
+      return feedRow(it, i === 0, running);
+    }).join("");
+  }
+
   function poll() {
     fetch("/run/status").then(function (r) { return r.json(); }).then(function (s) {
       var running = s.status === "running" || s.status === "done" || s.status === "error";
       idle.hidden = running;
       active.hidden = !running;
-      if (running) { paintStepper(s); paintProgress(s); }
+      if (running) { paintStepper(s); paintProgress(s); paintFeed(s); }
     }).catch(function () {});
   }
   setInterval(poll, 1500);
