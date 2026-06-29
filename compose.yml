@@ -57,8 +57,12 @@ services:
       dockerfile: Dockerfile
     image: job-agent:latest
     depends_on:
+      # НЕ ждём завершения model-init: `docker compose up` не должен висеть на
+      # загрузке ~2 ГБ модели. Прогрев идёт в фоне; если ночной прогон случится
+      # раньше — embedder дотянет модель сам (mount /models на запись, HF Hub
+      # координирует параллельную загрузку локами).
       model-init:
-        condition: service_completed_successfully
+        condition: service_started
       searxng:
         condition: service_started
     environment:
@@ -75,8 +79,9 @@ services:
     volumes:
       # Данные участника: config.json, резюме, шаблоны, карта поиска, выходной xlsx.
       - ${JOB_AGENT_DATA:-./data}:/data
-      # Кэш модели эмбеддингов (read-only — пишет только model-init).
-      - model_cache:/models:ro
+      # Кэш модели эмбеддингов. RW: если прогон случится до конца прогрева —
+      # embedder дотянет модель сам (HF Hub координирует загрузку локами).
+      - model_cache:/models
       # Том для seen-store (дедуп/водяной знак nightly) — переживает пересоздание.
       - seen_store:/var/lib/job-agent
       # Изолированный конфиг-дир CLI-агентов (claude/codex): по умолчанию свой
