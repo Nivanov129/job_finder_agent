@@ -144,7 +144,12 @@ class TelegramLogin:  # pragma: no cover - async Telethon / реальная с�
             return {"ok": False, "message": _clean_err(exc)}
         self._client, self._phone, self._code_hash = client, phone, code_hash
         self._api_id, self._api_hash = api_id, api_hash
-        return {"ok": True, "stage": "code", "message": "код отправлен в Telegram"}
+        return {
+            "ok": True,
+            "stage": "code",
+            "message": "Код пришёл СООБЩЕНИЕМ в приложение Telegram (от аккаунта "
+            "«Telegram»), не по SMS. Открой Telegram на телефоне → там код.",
+        }
 
     def submit_code(self, code: str) -> dict[str, object]:
         if self._client is None:

@@ -450,8 +450,10 @@ def render_telegram(*, has_session: bool = False, saved: list[str] | None = None
             '<section class="card"><div class="card__title">'
             f'{icon("ti-brand-telegram")} Вход в Telegram</div>'
             '<div class="card__meta">Только чтение твоих каналов. Введи номер — '
-            "придёт код в Telegram.</div>"
-            '<label class="field"><span class="field__label">Телефон</span>'
+            "Telegram пришлёт код <b>сообщением в само приложение Telegram</b> "
+            "(от аккаунта «Telegram»), <b>не по SMS</b>.</div>"
+            '<label class="field"><span class="field__label">Телефон '
+            "(с кодом страны)</span>"
             '<input class="input" name="tg_phone" placeholder="+79991234567"></label>'
             '<button type="button" class="btn btn--accent tg-start">'
             f'{icon("ti-send")} Получить код</button>'

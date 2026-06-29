@@ -61,6 +61,8 @@
       post("/telegram/login/start", { phone: field("tg_phone") }).then(function (r) {
         if (!r.ok) return loginMsg("✗ " + (r.body.message || "ошибка"), "is-error");
         codeForm();
+        // важно: показать, КУДА придёт код (в приложение Telegram, не SMS)
+        subMsg(r.body.message || "Код отправлен в приложение Telegram (не SMS).", "is-ok");
       }).catch(function () { loginMsg("✗ сеть", "is-error"); });
       return;
     }
