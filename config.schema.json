@@ -91,6 +91,11 @@
       "default": true,
       "description": "Включить агрегаторы vseti.app + getmatch."
     },
+    "use_linkedin": {
+      "type": "boolean",
+      "default": false,
+      "description": "Доп. источник: поиск вакансий на LinkedIn через web-поиск (дорки по ролям). Требует настроенного web_search."
+    },
 
     "scoring_engine": {
       "type": "string",

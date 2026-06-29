@@ -94,6 +94,8 @@ class Config(BaseModel):
 
     tg_channels: list[TgChannel] = Field(default_factory=list)
     use_aggregators: bool = True
+    # Доп. источник вакансий: дорки по ролям на LinkedIn через web-поиск (SearXNG).
+    use_linkedin: bool = False
 
     cli_tool: str | None = None
     api_base_url: str | None = None

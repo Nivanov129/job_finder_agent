@@ -21,6 +21,7 @@ from pathlib import Path
 
 from .collectors.base import Collector
 from .collectors.habr import HabrCollector
+from .collectors.linkedin import LinkedinSearchCollector
 from .collectors.telegram_private import (
     creds_from_env,
     creds_present,
@@ -148,6 +149,7 @@ def build_collectors(
     private_fetcher=None,
     vseti_fetcher=None,
     habr_fetcher=None,
+    linkedin_searcher: Searcher | None = None,
 ) -> list[Collector]:
     """Собрать коллекторы по конфигу (стадия 1). Фетчеры инъектируются в тестах.
 
@@ -176,6 +178,21 @@ def build_collectors(
     if config.use_aggregators:
         collectors.append(VsetiCollector(fetcher=vseti_fetcher))
         collectors.append(HabrCollector(fetcher=habr_fetcher))
+
+    if config.use_linkedin:
+        # Роли для дорков — допустимые роли треков (из резюме), иначе глобальные.
+        roles = [r for t in config.tracks for r in (t.role_gate or [])]
+        if not roles:
+            roles = list(config.global_role_gate)
+        searcher = linkedin_searcher
+        if searcher is None:
+            try:
+                searcher = make_searcher(config)
+            except Exception as exc:  # web-поиск не настроен — без LinkedIn
+                logger.warning("LinkedIn-источник пропущен: %s", exc)
+                searcher = None
+        if searcher is not None and roles:
+            collectors.append(LinkedinSearchCollector(roles, searcher))
 
     return collectors
 
