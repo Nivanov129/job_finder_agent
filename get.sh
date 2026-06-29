@@ -30,7 +30,7 @@ if [ -d "$DIR" ]; then
     git -C "$DIR" pull --ff-only >/dev/null 2>&1 || warn "не смог обновить код — продолжаю с текущим."
   fi
 else
-  info "Скачиваю Job Agent в ${DIR}…"
+  info "Скачиваю Job Agent в каталог: ${DIR}"
   if command -v git >/dev/null 2>&1; then
     git clone --depth 1 "$REPO_URL.git" "$DIR"
   else
