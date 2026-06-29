@@ -15,8 +15,10 @@ $Dir     = if ($env:JOB_AGENT_HOME) { $env:JOB_AGENT_HOME } else { Join-Path $en
 function Write-Info { param($m) Write-Host "==> $m" -ForegroundColor Cyan }
 function Write-Warn { param($m) Write-Host "!! $m"  -ForegroundColor Yellow }
 
+Write-Info "Всё ставится в ОДНУ папку: $Dir (программа и данные — только там)."
+
 if (Test-Path $Dir) {
-  Write-Info "Папка уже есть: $Dir — обновляю код, данные не трогаю."
+  Write-Info "Папка уже есть — обновляю код, данные (резюме/конфиг/.env) не трогаю."
   if ((Test-Path (Join-Path $Dir '.git')) -and (Get-Command git -ErrorAction SilentlyContinue)) {
     try { git -C $Dir pull --ff-only | Out-Null } catch { Write-Warn "не смог обновить код — продолжаю с текущим." }
   }
