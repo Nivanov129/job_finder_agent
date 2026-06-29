@@ -86,15 +86,16 @@ def test_ollama_cloud_needs_key() -> None:
     assert called is False  # без ключа в сеть не ходим
 
 
-def test_ollama_cloud_authorized_sends_bearer() -> None:
+def test_ollama_cloud_status_sends_bearer_but_cant_verify_key() -> None:
     def http_get(url: str, headers: dict) -> dict:
         assert url == "https://ollama.com/api/tags"
         assert headers["authorization"] == "Bearer sk-cloud"
         return {"models": [{"name": "gpt-oss:120b"}]}
 
     st = ollama_status("", api_key="sk-cloud", http_get=http_get)
-    assert st.authorized is True
-    assert "gpt-oss:120b" in st.detail
+    # /api/tags публичный и не валидирует ключ → честно «неизвестно» (не True).
+    assert st.authorized is None
+    assert "ключ задан" in st.detail and "моделей: 1" in st.detail
 
 
 def test_ollama_unreachable() -> None:

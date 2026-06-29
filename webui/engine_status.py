@@ -47,7 +47,7 @@ class EngineStatus:
     label: str
     billing: str  # subscription | free
     installed: bool | None  # None — неприменимо (ollama не CLI)
-    authorized: bool
+    authorized: bool | None  # None — неизвестно (нельзя проверить дёшево)
     detail: str  # короткая подсказка/версия (без секретов)
 
     def as_dict(self) -> dict[str, Any]:
@@ -158,6 +158,13 @@ def ollama_status(
     try:
         data = http_get(f"{base}/api/tags", _ollama_headers(api_key))
         models = [m.get("name", "") for m in (data.get("models") or [])]
+        n = len(list(filter(None, models)))
+        if is_cloud:
+            # /api/tags у ollama.com ПУБЛИЧНЫЙ — не проверяет ключ. Поэтому статус
+            # «авторизован» тут лгал бы. Честно: ключ задан, но не проверен —
+            # реальная проверка кнопкой «Проверить» (минимальный chat-запрос).
+            detail = f"ключ задан · моделей: {n} · проверь кнопкой «Проверить»"
+            return EngineStatus("ollama", label, "free", None, None, detail)
         detail = ("модели: " + ", ".join(filter(None, models))) if models else "сервер доступен"
         return EngineStatus("ollama", label, "free", None, True, detail)
     except Exception:

@@ -5,8 +5,9 @@
   "use strict";
 
   function pill(ok, text) {
-    var state = ok ? "ok" : "bad";
-    var glyph = ok ? "ti-circle-check" : "ti-circle-x";
+    // ok === null → неизвестно (не смогли проверить): нейтральная пилюля.
+    var state = ok == null ? "unknown" : ok ? "ok" : "bad";
+    var glyph = ok == null ? "ti-help-circle" : ok ? "ti-circle-check" : "ti-circle-x";
     return (
       '<span class="pill pill--' + state + '">' +
       '<i class="ti ' + glyph + '" aria-hidden="true"></i> ' +
@@ -25,7 +26,8 @@
           var parts = [];
           if (e.installed === true) parts.push(pill(true, "установлен"));
           else if (e.installed === false) parts.push(pill(false, "не установлен"));
-          parts.push(pill(e.authorized, e.authorized ? "авторизован" : "нет доступа"));
+          if (e.authorized == null) parts.push(pill(null, "ключ задан · проверь"));
+          else parts.push(pill(e.authorized, e.authorized ? "авторизован" : "нет доступа"));
           slot.innerHTML = parts.join(" ");
           slot.title = e.detail || "";
         });
