@@ -156,6 +156,8 @@
   flex-direction: column;
   gap: 8px;
 }
+/* атрибут hidden должен реально скрывать панель (display:flex его перебивал) */
+.auth-panel[hidden] { display: none; }
 
 .auth-panel__head {
   display: flex;
