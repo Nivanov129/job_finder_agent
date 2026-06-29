@@ -20,6 +20,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from .collectors.base import Collector
+from .collectors.career_sites import CareerSiteCollector
 from .collectors.habr import HabrCollector
 from .collectors.linkedin import LinkedinSearchCollector
 from .collectors.telegram_private import (
@@ -186,8 +187,9 @@ def build_collectors(
         collectors.append(VsetiCollector(fetcher=vseti_fetcher))
         collectors.append(HabrCollector(fetcher=habr_fetcher))
 
-    if config.use_linkedin:
-        # Роли для дорков — допустимые роли треков (из резюме), иначе глобальные.
+    # Дорк-источники (LinkedIn / карьерные сайты) делят web-поиск (SearXNG) и
+    # роли — допустимые роли треков (из резюме), иначе глобальные.
+    if config.use_linkedin or config.career_sites:
         roles = [r for t in config.tracks for r in (t.role_gate or [])]
         if not roles:
             roles = list(config.global_role_gate)
@@ -195,11 +197,16 @@ def build_collectors(
         if searcher is None:
             try:
                 searcher = make_searcher(config)
-            except Exception as exc:  # web-поиск не настроен — без LinkedIn
-                logger.warning("LinkedIn-источник пропущен: %s", exc)
+            except Exception as exc:  # web-поиск не настроен — без дорк-источников
+                logger.warning("Дорк-источники (LinkedIn/карьерные сайты) пропущены: %s", exc)
                 searcher = None
         if searcher is not None and roles:
-            collectors.append(LinkedinSearchCollector(roles, searcher))
+            if config.use_linkedin:
+                collectors.append(LinkedinSearchCollector(roles, searcher))
+            if config.career_sites:
+                collectors.append(
+                    CareerSiteCollector(roles, searcher, config.career_sites)
+                )
 
     return collectors
 

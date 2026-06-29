@@ -96,6 +96,10 @@ class Config(BaseModel):
     use_aggregators: bool = True
     # Доп. источник вакансий: дорки по ролям на LinkedIn через web-поиск (SearXNG).
     use_linkedin: bool = False
+    # Карьерные сайты компаний (домены, напр. "career.ozon.ru"): ищем на них
+    # вакансии дорком `"<роль>" site:<домен>` через web-поиск. Роли — из резюме
+    # (role_gate). Пустой список — источник выключен.
+    career_sites: list[str] = Field(default_factory=list)
 
     cli_tool: str | None = None
     api_base_url: str | None = None

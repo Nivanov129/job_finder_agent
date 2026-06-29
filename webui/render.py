@@ -173,11 +173,15 @@ def _profile_card(tracks: list[dict] | None = None, search_map_path: str = "") -
 
 
 def _sources_card(
-    use_aggregators: bool = True, private_handles: list[str] | None = None,
+    use_aggregators: bool = True,
+    private_handles: list[str] | None = None,
+    *,
+    career_sites: list[str] | None = None,
 ) -> str:
     agg = " checked" if use_aggregators else ""
     chip_cls = "chip chip--on" if use_aggregators else "chip"
     private_handles = private_handles or []
+    career_value = escape(", ".join(career_sites or []))
     if private_handles:
         chips = "".join(
             f'<span class="chip">{icon("ti-brand-telegram")} @{escape(h)}</span>'
@@ -202,6 +206,14 @@ def _sources_card(
         f'<label class="chip-toggle"><input type="checkbox" name="use_aggregators"{agg}>'
         f'<span class="{chip_cls}">{icon("ti-rss")} vseti.app</span>'
         f'<span class="{chip_cls}">{icon("ti-rss")} career.habr</span></label>'
+        '<label class="field"><span class="field__label">Карьерные сайты компаний'
+        "</span>"
+        '<input class="input" name="career_sites" '
+        f'placeholder="career.ozon.ru, jobs.yandex.ru" value="{career_value}">'
+        "</label>"
+        '<div class="card__meta">Домены компаний через запятую. Ищем на них '
+        "вакансии по твоим ролям из резюме (через web-поиск). Нужен включённый "
+        "web-поиск.</div>"
         "</section>"
     )
 
@@ -272,7 +284,11 @@ def render_settings(cfg: dict | None = None) -> str:
         _warning()
         + '<form method="post" action="/save">'
         + _profile_card(tracks, search_map_path)
-        + _sources_card(cfg.get("use_aggregators", True), private_handles)
+        + _sources_card(
+            cfg.get("use_aggregators", True),
+            private_handles,
+            career_sites=cfg.get("career_sites") or [],
+        )
         + _engine_pointer()
         + _output_card(
             threshold=int(cfg.get("cover_letter_threshold", 70)),
