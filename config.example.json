@@ -56,7 +56,7 @@
   "scoring_engine": "cli",
   "cli_tool": "codex",
 
-  "output_mode": "both",
+  "output_mode": "table",
   "backfill_days": 14,
   "cover_letter_threshold": 70,
   "output_lang": "ru",

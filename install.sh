@@ -68,27 +68,27 @@ info "Собираю образы (первый раз тянет базовые
 info "Поднимаю стек (пайплайн + SearXNG + прогрев модели эмбеддингов)…"
 "${COMPOSE[@]}" up -d
 
-# --- 4. Открыть конфиг для заполнения --------------------------------------
-open_config() {
-  if [ -n "${EDITOR:-}" ]; then
-    "$EDITOR" "$CONFIG_PATH" || true
-  elif command -v open >/dev/null 2>&1; then        # macOS
-    open "$CONFIG_PATH" || true
-  elif command -v xdg-open >/dev/null 2>&1; then     # Linux desktop
-    xdg-open "$CONFIG_PATH" >/dev/null 2>&1 || true
-  else
-    warn "Не нашёл, чем открыть конфиг — отредактируйте вручную: $CONFIG_PATH"
+# --- 4. Открыть веб-интерфейс ----------------------------------------------
+# Настройка, подбор и подборка — в web-UI (config.json можно править и руками).
+WEBUI_URL="http://localhost:8766"
+open_ui() {
+  if command -v open >/dev/null 2>&1; then           # macOS
+    open "$WEBUI_URL" >/dev/null 2>&1 || true
+  elif command -v xdg-open >/dev/null 2>&1; then      # Linux desktop
+    xdg-open "$WEBUI_URL" >/dev/null 2>&1 || true
   fi
 }
-open_config
+open_ui
 
 cat <<EOF
 
 Готово. Стек запущен в фоне.
-  Конфиг:       $CONFIG_PATH
-  Логи:         ${COMPOSE[*]} logs -f pipeline
-  Backfill:     ${COMPOSE[*]} run --rm pipeline backfill --days 14 --config /data/config.json --out /data/job-agent-result.xlsx
-  Остановить:   ${COMPOSE[*]} down
+  Веб-интерфейс:  $WEBUI_URL   ← настройка, подбор и подборка здесь
+  (на первом запуске UI поднимется через минуту — идёт прогрев модели эмбеддингов)
+  Конфиг (опц.):  $CONFIG_PATH
+  Логи:           ${COMPOSE[*]} logs -f
+  Остановить:     ${COMPOSE[*]} down
 
-Always-on: ночной мониторинг работает, только пока хост включён (см. README).
+Дальше: открой $WEBUI_URL → «Настройка» (резюме, направления, источники),
+затем «AI · авторизация» и «Telegram». Always-on работает, пока хост включён.
 EOF

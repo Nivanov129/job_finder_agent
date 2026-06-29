@@ -74,19 +74,22 @@ Write-Info "Поднимаю стек (пайплайн + SearXNG + прогре
 & $ComposeExe @ComposeArgs up -d
 if ($LASTEXITCODE -ne 0) { throw "compose up вернул $LASTEXITCODE" }
 
-# --- 4. Открыть конфиг для заполнения --------------------------------------
+# --- 4. Открыть веб-интерфейс ----------------------------------------------
+# Настройка, подбор и подборка — в web-UI (config.json можно править и руками).
+$WebUiUrl = 'http://localhost:8766'
 try {
-  Invoke-Item $ConfigPath
+  Start-Process $WebUiUrl
 } catch {
-  Write-Warn "Не нашёл, чем открыть конфиг — отредактируйте вручную: $ConfigPath"
+  Write-Warn "Открой вручную в браузере: $WebUiUrl"
 }
 
 $ComposeShown = $Compose -join ' '
 Write-Host ""
 Write-Host "Готово. Стек запущен в фоне."
-Write-Host "  Конфиг:       $ConfigPath"
-Write-Host "  Логи:         $ComposeShown logs -f pipeline"
-Write-Host "  Backfill:     $ComposeShown run --rm pipeline backfill --days 14 --config /data/config.json --out /data/job-agent-result.xlsx"
-Write-Host "  Остановить:   $ComposeShown down"
+Write-Host "  Веб-интерфейс:  $WebUiUrl   <- настройка, подбор и подборка здесь"
+Write-Host "  (на первом запуске UI поднимется через минуту - прогрев модели эмбеддингов)"
+Write-Host "  Конфиг (опц.):  $ConfigPath"
+Write-Host "  Логи:           $ComposeShown logs -f"
+Write-Host "  Остановить:     $ComposeShown down"
 Write-Host ""
-Write-Host "Always-on: ночной мониторинг работает, только пока хост включён (см. README)."
+Write-Host "Дальше: открой $WebUiUrl -> «Настройка», затем «AI · авторизация» и «Telegram»."
