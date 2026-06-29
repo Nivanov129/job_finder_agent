@@ -15,10 +15,13 @@
     return 'background:' + bg + ';color:' + fg;
   }
 
-  function stat(label, ic, value, hint) {
+  function stat(label, ic, value, hint, tone) {
+    var numStyle = tone === "green" ? ' style="color:#3B6D11"' : "";
+    var hintStyle = tone === "green" ? ' style="color:#185FA5"' : "";
     return (
       '<div class="stat-card"><div class="stat-card__l"><i class="ti ' + ic + '"></i>' + label + "</div>" +
-      '<div class="stat-card__v mono">' + value + (hint ? '<span class="stat-card__h">' + hint + "</span>" : "") + "</div></div>"
+      '<div class="stat-card__v mono"' + numStyle + ">" + value +
+      (hint ? '<span class="stat-card__h"' + hintStyle + ">" + hint + "</span>" : "") + "</div></div>"
     );
   }
 
@@ -48,22 +51,31 @@
     var on = !!ag.enabled;
     var title = $("[data-agent-title]"), sub = $("[data-agent-subtitle]");
     var toggle = $("[data-agent-toggle]"), hicon = $("[data-agent-hicon]");
-    if (title) title.textContent = on ? "Агент следит за вакансиями" : "Агент на паузе";
+    var hero = document.querySelector(".hero");
+    if (hero) hero.classList.toggle("hero--off", !on);
+    if (title) title.textContent = on ? "Агент следит за каналами" : "Мониторинг на паузе";
     if (sub) sub.textContent = on
-      ? "оценивает новые посты под твоё резюме в реальном времени"
-      : "включи, чтобы продолжить мониторинг каналов";
-    if (hicon) hicon.className = "hero__icon" + (on ? " hero__icon--on" : "");
-    if (toggle) toggle.innerHTML = '<i class="ti ' + (on ? "ti-player-pause" : "ti-player-play") +
-      '"></i>' + (on ? "Пауза" : "Запустить агента");
+      ? "Каждый новый пост в твоих каналах AI читает и оценивает под резюме — без твоего участия."
+      : "Новые посты не оцениваются. Включи, чтобы агент снова реагировал в реалтайме.";
+    if (hicon) {
+      hicon.className = "hero__icon" + (on ? " hero__icon--on" : " hero__icon--off");
+      hicon.innerHTML = '<i class="ti ' + (on ? "ti-radar-2" : "ti-player-pause") + '"></i>';
+    }
+    if (toggle) {
+      toggle.className = "btn hero__toggle agent-toggle" +
+        (on ? " hero__toggle--pause" : " btn--accent");
+      toggle.innerHTML = '<i class="ti ' + (on ? "ti-player-pause" : "ti-player-play") +
+        '"></i>' + (on ? "Пауза" : "Возобновить");
+    }
 
     var top = results.filter(function (r) { return r.resume >= 80; });
-    var ready = results.filter(function (r) { return r.resume >= 70; });
+    var letters = results.filter(function (r) { return r.has_cover; });
     var statsEl = $("[data-agent-stats]");
     if (statsEl) statsEl.innerHTML =
-      stat("Найдено", "ti-inbox", results.length) +
+      stat("Найдено", "ti-inbox", results.length, "за прогон") +
+      stat("Топ ≥80%", "ti-flame", top.length, "→ в бот", "green") +
       stat("Оценено", "ti-cpu", run.scored || run.written || 0) +
-      stat("В топе ≥80%", "ti-trophy", top.length) +
-      stat("Готово к отклику", "ti-send", ready.length);
+      stat("Письма готовы", "ti-mail-check", letters.length, "черновики");
 
     var feed = $("[data-agent-feed]");
     var rate = $("[data-agent-rate]");

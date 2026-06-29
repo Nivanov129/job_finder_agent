@@ -11,7 +11,8 @@
   --surface-0: #f5f4ef;
   --surface-1: #faf9f5;
   --surface-2: #ffffff;
-  --surface-sub: #FBFCF8;   /* подсветка строки-совпадения */
+  --surface-sub: #FBFAF6;   /* фон вложенных строк (пуши, хост) — как в прототипе */
+  --surface-accent-sub: #F6FAFE;  /* подсветка свежей строки-совпадения (голубой) */
 
   /* текст */
   --text-primary: #1a1a18;
@@ -43,7 +44,7 @@
   --track-bg: #EEEDFE; --track-fg: #3C3489;
 
   --radius: 8px;          /* кнопки/инпуты */
-  --radius-card: 12px;    /* карточки */
+  --radius-card: 14px;    /* карточки (прототип: секции/лента/хост = 14px) */
   --radius-panel: 10px;   /* внутренние панели */
   --radius-app: 16px;     /* внешняя оболочка */
 }

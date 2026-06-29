@@ -615,10 +615,10 @@ textarea.input {
   max-width: none; margin: 0; padding: 0; flex-wrap: nowrap;
 }
 .nav__item {
-  display: flex; align-items: center; gap: 10px; width: 100%;
-  padding: 9px 11px; border-radius: 9px; text-decoration: none;
-  font-size: 13px; font-weight: 500; color: var(--text-secondary);
-  white-space: nowrap;
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 9px 12px; border-radius: 9px; text-decoration: none;
+  font-size: 13.5px; font-weight: 500; color: var(--text-secondary);
+  white-space: nowrap; transition: background .12s;
 }
 .nav__item .ti { font-size: 18px; flex: none; }
 .nav__item--active { background: var(--bg-accent); color: var(--text-accent); font-weight: 600; }
@@ -635,10 +635,15 @@ textarea.input {
 /* — карточки/заголовки — */
 .card {
   background: var(--surface-2); border: 0.5px solid var(--border);
-  border-radius: var(--radius-card); padding: 15px 17px;
+  border-radius: var(--radius-card); padding: 17px 19px;
 }
-.card__title { font-size: 14px; font-weight: 600; letter-spacing: -.005em; }
+.card__title { font-size: 15px; font-weight: 600; letter-spacing: -.005em; }
 .card__meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+/* заголовки в шапках лент/панелей — мельче секционных (как в прототипе) */
+.feed-card__head .card__title,
+.run-feed__head .card__title { font-size: 13.5px; }
+.host-detail__head .card__title,
+.pushes__head .card__title { font-size: 13px; }
 /* — бейдж «резюме %» / тег / чипы (моно-цифры, точные диапазоны) — */
 .badge {
   display: inline-flex; align-items: baseline; gap: 5px;
@@ -722,13 +727,13 @@ textarea.input {
 /* — топбар — */
 .topbar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 18px 30px; border-bottom: 0.5px solid rgba(0,0,0,.07);
-  position: sticky; top: 0; z-index: 10; background: rgba(245,244,239,.85); backdrop-filter: blur(6px);
+  padding: 18px 30px; border-bottom: 0.5px solid rgba(0,0,0,.08);
+  position: sticky; top: 0; z-index: 20; background: rgba(245,244,239,.86); backdrop-filter: blur(8px);
 }
 .topbar__title { font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
 .topbar__sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .main { padding: 0; }
-.main__inner { padding: 22px 30px 64px; gap: 16px; }
+.main__inner { padding: 26px 30px 64px; gap: 16px; }
 .mode-chip {
   display: inline-flex; align-items: center; gap: 7px; flex: none;
   font-size: 12px; font-weight: 600; color: var(--text-secondary);
@@ -781,19 +786,22 @@ textarea.input {
 
 /* — дашборд «Агент» (обновлённый прототип) — */
 .hero { display: flex; align-items: center; justify-content: space-between; gap: 14px; background: var(--surface-2); border: 0.5px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+.hero--off { background: #FBF7EF; border-color: #EEDFC4; }
 .hero__l { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.hero__icon { width: 44px; height: 44px; border-radius: 12px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 24px; background: var(--band-grey-bg); color: var(--text-muted); }
-.hero__icon--on { background: var(--bg-accent); color: var(--text-accent); }
+.hero__icon { width: 46px; height: 46px; border-radius: 12px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #fff; }
+.hero__icon--on { background: var(--text-accent); animation: ja-pulse 2s infinite; }
+.hero__icon--off { background: #B79A5E; }
 .hero__title { font-size: 17px; font-weight: 600; }
 .hero__sub { font-size: 12.5px; color: var(--text-secondary); margin-top: 2px; }
-.hero__toggle { border-radius: 10px; padding: 10px 16px; }
+.hero__toggle { border-radius: 9px; padding: 10px 16px; }
+.hero__toggle--pause { background: var(--bg-warning); color: var(--text-warning); border: none; }
 .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 @media (max-width: 760px) { .stat-grid { grid-template-columns: 1fr 1fr; } }
 .stat-card { background: var(--surface-2); border: 0.5px solid var(--border); border-radius: 12px; padding: 14px 16px; }
 .stat-card__l { display: flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 11px; }
 .stat-card__v { font-size: 24px; font-weight: 600; margin-top: 8px; display: flex; align-items: baseline; gap: 7px; }
 .stat-card__h { font-size: 11px; color: var(--text-muted); font-family: var(--font-sans); }
-.agent-cols { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; align-items: start; }
+.agent-cols { display: grid; grid-template-columns: minmax(0,1.7fr) minmax(0,1fr); gap: 16px; align-items: start; }
 @media (max-width: 900px) { .agent-cols { grid-template-columns: 1fr; } }
 .feed-card { padding: 0; overflow: hidden; }
 .feed-card__head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 0.5px solid rgba(0,0,0,.08); }
@@ -876,7 +884,7 @@ textarea.input {
 .run-feed__list { display: flex; flex-direction: column; }
 .run-feed__row { display: flex; align-items: flex-start; gap: 11px; padding: 9px; border-radius: 10px; animation: ja-in .3s ease; }
 .run-feed__row + .run-feed__row { border-top: 0.5px solid rgba(0,0,0,.05); }
-.run-feed__row--fresh { background: var(--surface-sub); box-shadow: inset 2px 0 0 var(--fill-accent); }
+.run-feed__row--fresh { background: var(--surface-accent-sub); box-shadow: inset 2px 0 0 var(--fill-accent); }
 .run-feed__ic { width: 30px; height: 30px; border-radius: 8px; flex: none; display: flex; align-items: center; justify-content: center; background: var(--band-grey-bg); color: var(--text-secondary); font-size: 15px; }
 .run-feed__main { flex: 1; min-width: 0; }
 .run-feed__role { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
