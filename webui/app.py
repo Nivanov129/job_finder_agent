@@ -43,8 +43,6 @@ from webui.render import (
 )
 from webui.runner import BackfillRunner, read_last_run
 from webui.telegram_login import (
-    DEFAULT_API_HASH,
-    DEFAULT_API_ID,
     classify_channels,
 )
 
@@ -498,6 +496,9 @@ def create_app(
             render_telegram(
                 has_session=bool(env.get("TELEGRAM_SESSION")),
                 saved=saved,
+                has_api_creds=bool(
+                    env.get("TELEGRAM_API_ID") and env.get("TELEGRAM_API_HASH")
+                ),
             ),
             scripts='<script src="/static/js/telegram.js"></script>',
             active="/telegram",
@@ -507,12 +508,20 @@ def create_app(
     async def telegram_start(request: Request) -> JSONResponse:
         form = await request.form()
         env = {**os.environ, **parse_env(envfile)}
-        # api_id/api_hash зашиты (постоянны), .env переопределяет; форма — только телефон.
+        # api_id/api_hash — свои у каждого (my.telegram.org). Берём из формы (если
+        # ввёл) либо из .env; введённые запоминаем в .env, чтобы не вводить снова.
+        api_id = str(form.get("api_id", "")).strip() or env.get("TELEGRAM_API_ID", "")
+        api_hash = str(form.get("api_hash", "")).strip() or env.get("TELEGRAM_API_HASH", "")
+        if not (api_id and api_hash):
+            return JSONResponse(
+                {"ok": False, "message": "сначала укажи api_id и api_hash "
+                 "(my.telegram.org → API development tools)"},
+                status_code=400,
+            )
+        if str(form.get("api_id", "")).strip() or str(form.get("api_hash", "")).strip():
+            merge_env(envfile, {"TELEGRAM_API_ID": api_id, "TELEGRAM_API_HASH": api_hash})
         res = await run_in_threadpool(
-            _tg_login().start,
-            env.get("TELEGRAM_API_ID") or DEFAULT_API_ID,
-            env.get("TELEGRAM_API_HASH") or DEFAULT_API_HASH,
-            str(form.get("phone", "")),
+            _tg_login().start, api_id, api_hash, str(form.get("phone", "")),
         )
         return JSONResponse(res, status_code=200 if res.get("ok") else 400)
 

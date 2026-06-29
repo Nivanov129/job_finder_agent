@@ -434,12 +434,35 @@ def render_engine(
     )
 
 
-def render_telegram(*, has_session: bool = False, saved: list[str] | None = None) -> str:
-    """Экран «Telegram»: вход по телефону (api_id/api_hash зашиты) → код → 2FA,
-    затем выгрузка каналов с авто-подбором «про вакансии». Поток ведёт telegram.js.
+def render_telegram(
+    *,
+    has_session: bool = False,
+    saved: list[str] | None = None,
+    has_api_creds: bool = False,
+) -> str:
+    """Экран «Telegram»: свои api_id/api_hash (my.telegram.org) → телефон → код →
+    2FA, затем выгрузка каналов с авто-подбором. Поток ведёт telegram.js.
 
-    При активной сессии показываем «вход выполнен» + «Выйти», без формы телефона.
+    При активной сессии показываем «вход выполнен» + «Выйти», без формы.
     """
+    # Блок с инструкцией и полями api_id/api_hash. Если уже заданы — свёрнут.
+    creds_note = ' <span class="hint-set">заданы ✓</span>' if has_api_creds else ""
+    creds = (
+        f'<details class="tg-creds"{"" if not has_api_creds else ""}>'
+        f'<summary>{icon("ti-key")} Telegram API: api_id и api_hash{creds_note}'
+        "</summary>"
+        '<div class="card__meta">Один раз получи их (бесплатно, 2 минуты): открой '
+        '<a href="https://my.telegram.org" target="_blank" rel="noopener">'
+        "my.telegram.org</a> → войди по своему номеру → «API development tools» → "
+        "создай приложение (App title/short name — любые, например «job-agent») → "
+        "скопируй <b>api_id</b> (число) и <b>api_hash</b> (строка).</div>"
+        '<label class="field"><span class="field__label">api_id</span>'
+        '<input class="input" name="api_id" placeholder="напр. 1234567"></label>'
+        '<label class="field"><span class="field__label">api_hash</span>'
+        '<input class="input" name="api_hash" type="password" '
+        'placeholder="строка из my.telegram.org"></label>'
+        "</details>"
+    )
     if has_session:
         login = (
             '<section class="card"><div class="card__title">'
@@ -456,10 +479,12 @@ def render_telegram(*, has_session: bool = False, saved: list[str] | None = None
         login = (
             '<section class="card"><div class="card__title">'
             f'{icon("ti-brand-telegram")} Вход в Telegram</div>'
-            '<div class="card__meta">Только чтение твоих каналов. Введи номер — '
-            "Telegram пришлёт код <b>сообщением в само приложение Telegram</b> "
-            "(от аккаунта «Telegram»), <b>не по SMS</b>.</div>"
-            '<label class="field"><span class="field__label">Телефон '
+            '<div class="card__meta">Только чтение твоих каналов. Сначала укажи свои '
+            "api_id/api_hash (один раз), затем номер — Telegram пришлёт код "
+            "<b>сообщением в само приложение Telegram</b> (от аккаунта «Telegram»), "
+            "<b>не по SMS</b>.</div>"
+            + creds
+            + '<label class="field"><span class="field__label">Телефон '
             "(с кодом страны)</span>"
             '<input class="input" name="tg_phone" placeholder="+79991234567"></label>'
             '<button type="button" class="btn btn--accent tg-start">'

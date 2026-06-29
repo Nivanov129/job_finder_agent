@@ -58,7 +58,11 @@
     }
     if (ev.target.closest(".tg-start")) {
       loginMsg("Отправляю код…");
-      post("/telegram/login/start", { phone: field("tg_phone") }).then(function (r) {
+      post("/telegram/login/start", {
+        phone: field("tg_phone"),
+        api_id: field("api_id"),
+        api_hash: field("api_hash"),
+      }).then(function (r) {
         if (!r.ok) return loginMsg("✗ " + (r.body.message || "ошибка"), "is-error");
         codeForm();
         // важно: показать, КУДА придёт код (в приложение Telegram, не SMS)

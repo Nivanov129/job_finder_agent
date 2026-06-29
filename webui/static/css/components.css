@@ -347,6 +347,12 @@
 .field__hint { font-size: 11px; color: var(--text-muted); min-height: 14px; }
 .field__hint.is-ok { color: var(--text-success); }
 .field__hint.is-error { color: var(--text-warning); }
+/* блок api_id/api_hash на экране Telegram */
+.tg-creds { border: 0.5px solid var(--border); border-radius: var(--radius-panel); padding: 8px 11px; margin: 10px 0; background: var(--surface-1); }
+.tg-creds summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 7px; }
+.tg-creds summary .ti { color: var(--text-accent); }
+.tg-creds .field { margin-top: 9px; }
+.tg-creds .card__meta { margin-top: 8px; }
 
 .input {
   font: inherit;

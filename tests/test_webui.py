@@ -535,9 +535,10 @@ class _FakeTg:
 def test_telegram_page_renders(tmp_path: Path) -> None:
     client = TestClient(create_app(config_path=tmp_path / "config.json"))
     body = client.get("/telegram").text
-    # без сессии — форма телефона; api_id/api_hash зашиты, полей нет
+    # без сессии — форма телефона + поля своих api_id/api_hash (не зашиты в код)
     assert "Вход в Telegram" in body and 'name="tg_phone"' in body
-    assert 'name="tg_api_id"' not in body and 'name="tg_api_hash"' not in body
+    assert 'name="api_id"' in body and 'name="api_hash"' in body
+    assert "my.telegram.org" in body  # инструкция, где их взять
     assert "/static/js/telegram.js" in body
 
 
