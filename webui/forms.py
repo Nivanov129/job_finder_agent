@@ -165,6 +165,13 @@ def engine_config_from_form(
         # сессия пишется отдельно — здесь сохраняем только выбор движка.
         config["scoring_engine"] = "cli"
         config["cli_tool"] = engine
+        if engine == "claude":
+            # Надёжный путь: токен от `claude setup-token` (на своей машине, где
+            # работает браузер) — вставляется сюда и пишется в .env. Внутри-
+            # контейнерный OAuth-обмен кода часто падает с 400, поэтому даём поле.
+            token = _clean(form.get("claude_token", ""))
+            if token:  # секрет — в .env, не в config.json
+                secrets["CLAUDE_CODE_OAUTH_TOKEN"] = token
     elif engine == "ollama":
         # Выбор модели в UI убран — движок берёт бесплатную модель по умолчанию.
         config["scoring_engine"] = "ollama"

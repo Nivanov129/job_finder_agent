@@ -376,6 +376,7 @@ def render_engine(
     cli_tool: str = "codex",
     has_ollama_key: bool = False,
     has_openrouter_key: bool = False,
+    has_claude_token: bool = False,
 ) -> str:
     """Экран «AI · авторизация»: выбор движка, статус, авторизация, web-поиск.
 
@@ -411,13 +412,25 @@ def render_engine(
 
     claude_panel = _auth_panel(
         "claude",
-        "Claude Code — вход по setup-token (без API-ключа)",
-        "Вход в один клик: сервер запустит <code>claude setup-token</code> и "
-        "покажет ссылку — откройте её, авторизуйтесь в Anthropic (нужна подписка "
-        "Claude), получите <b>код</b>, вставьте его в поле ниже и нажмите «Готово». "
-        "Токен сохранится локально (<code>CLAUDE_CODE_OAUTH_TOKEN</code>)."
-        + _login_widget("claude"),
-        "",  # claude авторизуется по setup-token, поля ключа нет
+        "Claude Code — токен подписки",
+        # Надёжный путь — токен с СВОЕГО компьютера: внутри-контейнерный OAuth-обмен
+        # кода у claude штатно падает (нет локального callback в Docker — так в доках
+        # Claude Code). Поэтому ведём пользователя сгенерировать токен там, где есть
+        # браузер, и вставить его сюда.
+        "<b>Надёжный способ</b> (нужна подписка <b>Claude Pro/Max</b>):<br>"
+        "1) на <b>своём компьютере</b> в терминале выполни "
+        "<code>claude setup-token</code> → пройди вход в браузере;<br>"
+        "2) скопируй напечатанный токен <code>sk-ant-oat01-…</code>;<br>"
+        "3) вставь его в поле ниже и нажми <b>«Сохранить»</b>, затем «Проверить»."
+        "<details class=\"tg-creds\"><summary>Или вход через браузер прямо отсюда "
+        "(часто не срабатывает в Docker)</summary>"
+        "<div class=\"card__meta\">Сервер запустит <code>claude setup-token</code>, "
+        "покажет ссылку → авторизуйся → вставь <b>код</b> → «Готово».</div>"
+        + _login_widget("claude")
+        + "</details>",
+        secret_field("claude_token", "CLAUDE_CODE_OAUTH_TOKEN",
+                     "sk-ant-oat01-… (claude setup-token на своём компе)",
+                     has=has_claude_token),
         visible=active == "claude",
     )
     codex_panel = _auth_panel(

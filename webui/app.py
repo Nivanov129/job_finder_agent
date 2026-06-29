@@ -331,6 +331,7 @@ def create_app(
                 cli_tool=cfg.get("cli_tool", "codex"),
                 has_ollama_key=bool(env.get("OLLAMA_API_KEY")),
                 has_openrouter_key=bool(env.get("OPENROUTER_API_KEY")),
+                has_claude_token=bool(env.get("CLAUDE_CODE_OAUTH_TOKEN")),
             ),
             scripts='<script src="/static/js/engine.js"></script>',
             active="/engine",

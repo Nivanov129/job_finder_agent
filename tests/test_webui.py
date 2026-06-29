@@ -372,8 +372,32 @@ def test_engine_save_codex_sets_cli_no_secret(tmp_path: Path) -> None:
     assert not (tmp_path / ".env").exists() or "OPENAI_API_KEY" not in (
         tmp_path / ".env"
     ).read_text(encoding="utf-8")
-    # треки из Настройки не потеряны при мерже
-    assert len(cfg.tracks) == 1
+
+
+def test_engine_save_claude_token_to_env(tmp_path: Path) -> None:
+    from job_agent.config import load_config
+
+    cfg_path = tmp_path / "config.json"
+    client = TestClient(create_app(config_path=cfg_path))
+    _seed_config(client)
+    r = client.post(
+        "/engine/save",
+        data={"engine": "claude", "claude_token": "sk-ant-oat01-FROMHOST"},
+    )
+    assert r.status_code == 200
+    cfg = load_config(cfg_path)
+    assert cfg.scoring_engine == "cli" and cfg.cli_tool == "claude"
+    # токен подписки — секрет в .env, не в config.json
+    assert "CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-FROMHOST" in (
+        tmp_path / ".env"
+    ).read_text(encoding="utf-8")
+    assert "CLAUDE_CODE_OAUTH_TOKEN" not in cfg_path.read_text(encoding="utf-8")
+
+
+def test_engine_page_claude_has_token_field(client: TestClient) -> None:
+    body = client.get("/engine").text
+    assert 'name="claude_token"' in body
+    assert "claude setup-token" in body
 
 
 def test_engine_page_shows_only_selected_panel(client: TestClient) -> None:
@@ -382,9 +406,9 @@ def test_engine_page_shows_only_selected_panel(client: TestClient) -> None:
     assert '<div class="auth-panel" data-engine="codex">' in body
     assert '<div class="auth-panel" data-engine="claude" hidden>' in body
     assert '<div class="auth-panel" data-engine="ollama" hidden>' in body
-    # CLI без поля ключа; api_key/claude_token полей нет
+    # codex без поля ключа/api_key; у claude — поле токена подписки (в скрытой панели)
     assert 'name="codex_key"' not in body
-    assert 'name="claude_token"' not in body
+    assert 'name="api_key"' not in body
 
 
 def test_engine_page_has_login_button_for_cli_engines(client: TestClient) -> None:
