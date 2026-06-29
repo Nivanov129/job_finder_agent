@@ -125,23 +125,32 @@ class TelegramLogin:  # pragma: no cover - async Telethon / реальная с�
         if not _PHONE_RE.match(phone):
             return {"ok": False, "message": "телефон в формате +79991234567"}
 
-        async def _go() -> tuple[Any, str]:
+        async def _go() -> tuple[Any, str, str]:
             client = self._factory(api_id, api_hash, "")
             await client.connect()
             sent = await client.send_code_request(phone)
-            return client, sent.phone_code_hash
+            # Telegram сам решает КУДА слать код — отдаём это пользователю явно.
+            return client, sent.phone_code_hash, type(sent.type).__name__
 
         try:
-            client, code_hash = self._run(_go())
+            client, code_hash, code_type = self._run(_go())
         except Exception as exc:
             return {"ok": False, "message": _clean_err(exc)}
         self._client, self._phone, self._code_hash = client, phone, code_hash
         self._api_id, self._api_hash = api_id, api_hash
+        where = {
+            "SentCodeTypeApp": "СООБЩЕНИЕМ в приложение Telegram (от аккаунта "
+            "«Telegram») — открой Telegram на телефоне, код там, НЕ в SMS",
+            "SentCodeTypeSms": "по SMS на твой номер",
+            "SentCodeTypeCall": "звонком на номер — продиктуют код",
+            "SentCodeTypeFlashCall": "звонком (введи последние цифры номера)",
+            "SentCodeTypeMissedCall": "пропущенным звонком (код — последние цифры "
+            "номера, с которого звонят)",
+        }.get(code_type, "в Telegram")
         return {
             "ok": True,
             "stage": "code",
-            "message": "Код пришёл СООБЩЕНИЕМ в приложение Telegram (от аккаунта "
-            "«Telegram»), не по SMS. Открой Telegram на телефоне → там код.",
+            "message": f"Код отправлен {where}. Введи его ниже.",
         }
 
     def submit_code(self, code: str) -> dict[str, object]:
