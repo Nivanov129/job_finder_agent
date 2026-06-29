@@ -658,7 +658,7 @@ def test_engine_ollama_models_route_recommends_first(tmp_path: Path, monkeypatch
 
     def fake_get(url, headers):
         captured["headers"] = headers
-        return {"models": [{"name": "random-model:1b"}, {"name": "gpt-oss:120b"}]}
+        return {"data": [{"id": "random-model:1b"}, {"id": "gpt-oss:120b"}]}
 
     monkeypatch.setattr(es, "_default_http_get", fake_get)
     client = TestClient(create_app(config_path=tmp_path / "config.json"))

@@ -187,41 +187,36 @@ def test_api_from_config_requires_key() -> None:
 
 
 def test_ollama_explain_http_error_codes() -> None:
-    assert "ключ неверный" in ollama_explain(401, "m")
-    # 403 = ключ принят, но нет доступа к модели (подписка/недоступна)
-    msg = ollama_explain(403, "gpt-oss:120b")
-    assert "нет доступа" in msg and "gpt-oss:120b" in msg
-    assert "не найдена" in ollama_explain(404, "m")
+    assert "ключ" in ollama_explain(401, "m")
+    assert "ключ" in ollama_explain(403, "m")  # 401/403 → проблема с ключом/доступом
+    assert "не найдена" in ollama_explain(404, "gpt-oss:120b")
     assert "лимит" in ollama_explain(429, "m")
 
 
-def test_ollama_request_shape_no_stream() -> None:
+def _openai_reply(text: str) -> dict:
+    return {"choices": [{"message": {"content": text}}]}
+
+
+def test_ollama_request_shape_openai_v1() -> None:
     url, headers, body = ollama_build_request("http://localhost:11434", "llama3.1", "P")
-    assert url == "http://localhost:11434/api/chat"
+    assert url == "http://localhost:11434/v1/chat/completions"
     assert body["stream"] is False
-    assert body["model"] == "llama3.1"
+    assert body["model"] == "llama3.1"  # имя как есть, без :cloud
     assert body["messages"] == [{"role": "user", "content": "P"}]
     # Локальный сервер — без заголовка авторизации.
     assert "authorization" not in headers
 
 
-def test_ollama_cloud_adds_bearer_auth() -> None:
-    _, headers, _ = ollama_build_request(
-        "https://ollama.com", "gpt-oss:120b", "P", api_key="sk-cloud"
+def test_ollama_cloud_adds_bearer_and_v1() -> None:
+    url, headers, body = ollama_build_request(
+        "https://ollama.com", "glm-5.2", "P", api_key="sk-cloud"
     )
+    assert url == "https://ollama.com/v1/chat/completions"
     assert headers["authorization"] == "Bearer sk-cloud"
-
-
-def test_ollama_cloud_model_gets_cloud_tag() -> None:
-    # На облаке безтеговое имя адресуется как <name>:cloud (как в приложении Ollama).
-    _, _, body = ollama_build_request("https://ollama.com", "glm-5.2", "P")
-    assert body["model"] == "glm-5.2:cloud"
-    # Уже тегированное имя не трогаем.
-    _, _, body2 = ollama_build_request("https://ollama.com", "gpt-oss:120b", "P")
-    assert body2["model"] == "gpt-oss:120b"
-    # Локальный сервер — без :cloud.
-    _, _, body3 = ollama_build_request("http://localhost:11434", "glm-5.2", "P")
-    assert body3["model"] == "glm-5.2"
+    assert body["model"] == "glm-5.2"  # без суффикса :cloud
+    # base уже с /v1 — не дублируем
+    url2, _, _ = ollama_build_request("https://ollama.com/v1", "glm-5.2", "P")
+    assert url2 == "https://ollama.com/v1/chat/completions"
 
 
 def test_ollama_from_config_reads_cloud_key_from_env(monkeypatch) -> None:
@@ -230,7 +225,7 @@ def test_ollama_from_config_reads_cloud_key_from_env(monkeypatch) -> None:
 
     def transport(url: str, headers: dict[str, str], body: dict) -> dict:
         captured.update(headers)
-        return {"message": {"content": "ok"}}
+        return _openai_reply("ok")
 
     engine = OllamaEngine.from_config(
         _config("ollama", ollama_model="gpt-oss:120b"), transport=transport
@@ -239,26 +234,27 @@ def test_ollama_from_config_reads_cloud_key_from_env(monkeypatch) -> None:
     assert captured["authorization"] == "Bearer sk-from-env"
 
 
-def test_ollama_defaults_to_cloud_host(monkeypatch) -> None:
+def test_ollama_defaults_to_cloud_v1(monkeypatch) -> None:
     monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
     captured: dict[str, str] = {}
 
     def transport(url: str, headers: dict[str, str], body: dict) -> dict:
         captured["url"] = url
-        return {"message": {"content": "ok"}}
+        return _openai_reply("ok")
 
     OllamaEngine("gpt-oss:120b", transport=transport).complete("x")
-    assert captured["url"] == "https://ollama.com/api/chat"
+    assert captured["url"] == "https://ollama.com/v1/chat/completions"
 
 
-def test_ollama_parse_response() -> None:
-    assert ollama_parse_response({"message": {"content": " ответ "}}) == "ответ"
+def test_ollama_parse_response_openai() -> None:
+    assert ollama_parse_response(_openai_reply(" ответ ")) == "ответ"
     assert ollama_parse_response({}) == ""
+    assert ollama_parse_response({"choices": []}) == ""
 
 
 def test_ollama_engine_uses_transport_and_ignores_web_search() -> None:
     def transport(url: str, headers: dict[str, str], body: dict) -> dict:
-        return {"message": {"content": "локально"}}
+        return _openai_reply("локально")
 
     engine = OllamaEngine("llama3.1:70b", transport=transport)
     assert engine.complete("x", web_search=True) == "локально"

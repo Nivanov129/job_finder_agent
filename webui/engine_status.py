@@ -98,25 +98,20 @@ def _ollama_headers(api_key: str | None) -> dict[str, str]:
 def ollama_models(
     url: str = "", *, api_key: str | None = None, http_get: HttpGetFn | None = None
 ) -> list[str]:
-    """Список доступных моделей Ollama (облако или свой сервер) через `/api/tags`.
+    """Список моделей Ollama через OpenAI-совместимый `/v1/models`.
 
-    Облако (`ollama.com`) требует ключ — заголовок `Authorization: Bearer`.
-    Сетевые ошибки наружу не пробрасываются: недоступность → пустой список.
+    Возвращает id моделей (как есть, без суффикса `:cloud`). Облако и свой сервер
+    оба отдают OpenAI-формат `{data:[{id}]}`. Сетевые ошибки → пустой список.
     """
+    from job_agent.engines.ollama import v1_base
+
     http_get = http_get or _default_http_get
-    base = (url or CLOUD_BASE_URL).rstrip("/")
-    is_cloud = "ollama.com" in base
+    base = url or CLOUD_BASE_URL
     try:
-        data = http_get(f"{base}/api/tags", _ollama_headers(api_key))
+        data = http_get(f"{v1_base(base)}/models", _ollama_headers(api_key))
     except Exception:
         return []
-    names = [m.get("name", "") for m in (data.get("models") or []) if m.get("name")]
-    if is_cloud:
-        # Облако адресуется тегом :cloud (как в приложении Ollama) — нормализуем.
-        from job_agent.engines.ollama import cloud_model_name
-
-        names = list(dict.fromkeys(cloud_model_name(n) for n in names))
-    return names
+    return [m.get("id", "") for m in (data.get("data") or []) if m.get("id")]
 
 
 # Семейства моделей, хорошо подходящих под нашу задачу (скоринг: рассуждение,
@@ -155,12 +150,14 @@ def ollama_status(
             "ollama", label, "free", None, False,
             "нужен ключ OLLAMA_API_KEY (ollama.com/settings/keys)",
         )
+    from job_agent.engines.ollama import v1_base
+
     try:
-        data = http_get(f"{base}/api/tags", _ollama_headers(api_key))
-        models = [m.get("name", "") for m in (data.get("models") or [])]
+        data = http_get(f"{v1_base(base)}/models", _ollama_headers(api_key))
+        models = [m.get("id", "") for m in (data.get("data") or [])]
         n = len(list(filter(None, models)))
         if is_cloud:
-            # /api/tags у ollama.com ПУБЛИЧНЫЙ — не проверяет ключ. Поэтому статус
+            # /v1/models у ollama.com ПУБЛИЧНЫЙ — не проверяет ключ. Поэтому статус
             # «авторизован» тут лгал бы. Честно: ключ задан, но не проверен —
             # реальная проверка кнопкой «Проверить» (минимальный chat-запрос).
             detail = f"ключ задан · моделей: {n} · проверь кнопкой «Проверить»"

@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 __all__ = [
     "OllamaEngine",
     "build_request",
-    "cloud_model_name",
+    "v1_base",
     "parse_response",
     "explain_http_error",
     "DEFAULT_BASE_URL",
@@ -42,52 +42,47 @@ DEFAULT_BASE_URL = CLOUD_BASE_URL
 OLLAMA_API_KEY_ENV = "OLLAMA_API_KEY"
 
 
-def cloud_model_name(model: str) -> str:
-    """Имя облачной модели Ollama адресуется тегом `:cloud` (как в приложении
-    Ollama: `glm-5.2:cloud`). Если тега ещё нет — добавляем; иначе оставляем как
-    есть (у уже тегированных вроде `gpt-oss:120b` свой тег)."""
-    model = model.strip()
-    if not model or ":" in model:
-        return model
-    return f"{model}:cloud"
+def v1_base(base_url: str) -> str:
+    """Базовый OpenAI-совместимый префикс `…/v1` (без дублирования /v1)."""
+    base = base_url.rstrip("/")
+    if base.endswith("/v1"):
+        return base
+    return f"{base}/v1"
 
 
 def build_request(
     base_url: str, model: str, prompt: str, *, api_key: str | None = None
 ) -> tuple[str, dict[str, str], dict[str, Any]]:
-    """Собрать (url, headers, body) для `/api/chat` Ollama (без стриминга).
+    """Запрос к OpenAI-совместимому `/v1/chat/completions` Ollama (без стриминга).
 
-    При непустом `api_key` добавляется заголовок `Authorization: Bearer <key>`
-    (Ollama Cloud); для локального сервера ключ не нужен — заголовок опускается.
-    Для облака (`ollama.com`) имя модели нормализуется к `<name>:cloud`.
+    Ollama Cloud (`ollama.com`) и локальный сервер (`:11434`) оба поддерживают
+    OpenAI-формат. При непустом `api_key` — заголовок `Authorization: Bearer`
+    (облако). Имя модели — как в `/v1/models`, без суффикса `:cloud`.
     """
-    base = base_url.rstrip("/")
-    name = cloud_model_name(model) if "ollama.com" in base else model
     headers = {"content-type": "application/json"}
     if api_key:
         headers["authorization"] = f"Bearer {api_key}"
     body: dict[str, Any] = {
-        "model": name,
+        "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "stream": False,
     }
-    return f"{base}/api/chat", headers, body
+    return f"{v1_base(base_url)}/chat/completions", headers, body
 
 
 def parse_response(data: dict[str, Any]) -> str:
-    """Достать текст ответа из JSON Ollama (`message.content`)."""
-    return (data.get("message", {}).get("content") or "").strip()
+    """Достать текст из OpenAI-ответа (`choices[0].message.content`)."""
+    choices = data.get("choices") or []
+    if not choices:
+        return ""
+    return (choices[0].get("message", {}).get("content") or "").strip()
 
 
 def explain_http_error(status: int, model: str) -> str:
     """Понятное сообщение под коды Ollama Cloud (вместо сырого httpx-исключения)."""
-    if status == 401:
-        return ("Ollama Cloud: ключ неверный или просрочен — возьми новый на "
-                "ollama.com/settings/keys и вставь заново.")
-    if status == 403:
-        return (f"Ollama Cloud: ключ принят, но нет доступа к модели «{model}». "
-                "Обычно нужна подписка Ollama Cloud или модель не доступна твоему "
-                "аккаунту — выбери другую облачную модель (или используй Codex).")
+    if status in (401, 403):
+        return ("Ollama Cloud: ключ неверный/просрочен или нет доступа — возьми "
+                "новый на ollama.com → Settings → Keys и вставь заново.")
     if status == 404:
         return (f"Ollama Cloud: модель «{model}» не найдена — выбери модель из "
                 "списка «Загрузить модели».")

@@ -61,9 +61,9 @@ def test_codex_authorized_by_env_key(tmp_path: Path) -> None:
 
 def test_ollama_local_reachable_lists_models() -> None:
     def http_get(url: str, headers: dict) -> dict:
-        assert url.endswith("/api/tags")
+        assert url.endswith("/v1/models")  # OpenAI-совместимый эндпоинт
         assert "authorization" not in headers  # свой сервер — без ключа
-        return {"models": [{"name": "llama3.1:70b"}]}
+        return {"data": [{"id": "llama3.1:70b"}]}
 
     st = ollama_status("http://ollama:11434", http_get=http_get)
     assert st.authorized is True and st.installed is None
@@ -88,12 +88,12 @@ def test_ollama_cloud_needs_key() -> None:
 
 def test_ollama_cloud_status_sends_bearer_but_cant_verify_key() -> None:
     def http_get(url: str, headers: dict) -> dict:
-        assert url == "https://ollama.com/api/tags"
+        assert url == "https://ollama.com/v1/models"
         assert headers["authorization"] == "Bearer sk-cloud"
-        return {"models": [{"name": "gpt-oss:120b"}]}
+        return {"data": [{"id": "gpt-oss:120b"}]}
 
     st = ollama_status("", api_key="sk-cloud", http_get=http_get)
-    # /api/tags публичный и не валидирует ключ → честно «неизвестно» (не True).
+    # /v1/models публичный и не валидирует ключ → честно «неизвестно» (не True).
     assert st.authorized is None
     assert "ключ задан" in st.detail and "моделей: 1" in st.detail
 
@@ -106,23 +106,14 @@ def test_ollama_unreachable() -> None:
     assert st.authorized is False
 
 
-def test_ollama_models_helper_returns_names() -> None:
+def test_ollama_models_helper_returns_ids() -> None:
     def http_get(url: str, headers: dict) -> dict:
+        assert url == "https://ollama.com/v1/models"
         assert headers["authorization"] == "Bearer k"
-        return {"models": [{"name": "a"}, {"name": "b"}, {"other": "x"}]}
+        return {"data": [{"id": "a"}, {"id": "b"}, {"other": "x"}]}
 
-    # Облако (url="" → ollama.com): имена нормализуются к тегу :cloud.
-    assert ollama_models("", api_key="k", http_get=http_get) == ["a:cloud", "b:cloud"]
-
-
-def test_ollama_models_local_keeps_bare_names() -> None:
-    def http_get(url: str, headers: dict) -> dict:
-        return {"models": [{"name": "llama3.1"}, {"name": "qwen2.5"}]}
-
-    # Локальный сервер — без :cloud.
-    assert ollama_models("http://localhost:11434", http_get=http_get) == [
-        "llama3.1", "qwen2.5",
-    ]
+    # OpenAI-формат /v1/models: id как есть, без :cloud.
+    assert ollama_models("", api_key="k", http_get=http_get) == ["a", "b"]
 
 
 def test_ollama_models_helper_swallows_errors() -> None:
