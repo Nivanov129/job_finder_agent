@@ -19,6 +19,7 @@ import json
 import os
 import re
 import sqlite3
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -57,8 +58,12 @@ class MatchStore:
         self.path = _resolve_db_path(db_path)
         if self.path not in (":memory:", "") and not self.path.startswith("file:"):
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(self.path)
+        # Скоринг апсёртит из ПАРАЛЛЕЛЬНЫХ потоков (config.parallelism), а sqlite по
+        # умолчанию привязан к создавшему потоку. check_same_thread=False + общий
+        # лок на операции делают одно соединение безопасным для всех потоков.
+        self._conn = sqlite3.connect(self.path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        self._lock = threading.Lock()
         self._init_schema()
 
     def _init_schema(self) -> None:
@@ -95,23 +100,24 @@ class MatchStore:
             int(match.get("resume") or 0), int(match.get("map") or 0),
             match.get("verdict"), match.get("link"), data,
         )
-        exists = self._conn.execute(
-            "SELECT 1 FROM matches WHERE key=?", (key,)
-        ).fetchone()
-        if exists:
-            self._conn.execute(
-                "UPDATE matches SET role=?,company=?,track=?,resume=?,map=?,"
-                "verdict=?,link=?,data=?,last_seen=? WHERE key=?",
-                (*cols, stamp, key),
-            )
-        else:
-            self._conn.execute(
-                "INSERT INTO matches(key,role,company,track,resume,map,verdict,"
-                "link,data,status,first_seen,last_seen) "
-                "VALUES(?,?,?,?,?,?,?,?,?,'active',?,?)",
-                (key, *cols, stamp, stamp),
-            )
-        self._conn.commit()
+        with self._lock:
+            exists = self._conn.execute(
+                "SELECT 1 FROM matches WHERE key=?", (key,)
+            ).fetchone()
+            if exists:
+                self._conn.execute(
+                    "UPDATE matches SET role=?,company=?,track=?,resume=?,map=?,"
+                    "verdict=?,link=?,data=?,last_seen=? WHERE key=?",
+                    (*cols, stamp, key),
+                )
+            else:
+                self._conn.execute(
+                    "INSERT INTO matches(key,role,company,track,resume,map,verdict,"
+                    "link,data,status,first_seen,last_seen) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,'active',?,?)",
+                    (key, *cols, stamp, stamp),
+                )
+            self._conn.commit()
         return key
 
     def list(
@@ -133,8 +139,10 @@ class MatchStore:
             args.append(int(min_resume))
         query += " ORDER BY first_seen DESC, resume DESC LIMIT ?"
         args.append(int(limit))
+        with self._lock:
+            rows = self._conn.execute(query, args).fetchall()
         out: list[dict[str, Any]] = []
-        for row in self._conn.execute(query, args):
+        for row in rows:
             item = json.loads(row["data"])
             item["first_seen"] = row["first_seen"]
             item["last_seen"] = row["last_seen"]
@@ -144,11 +152,12 @@ class MatchStore:
 
     def set_status(self, key: str, status: str) -> bool:
         """Сменить статус (напр. 'archived'); True — если строка нашлась."""
-        cur = self._conn.execute(
-            "UPDATE matches SET status=? WHERE key=?", (status, key)
-        )
-        self._conn.commit()
-        return cur.rowcount > 0
+        with self._lock:
+            cur = self._conn.execute(
+                "UPDATE matches SET status=? WHERE key=?", (status, key)
+            )
+            self._conn.commit()
+            return cur.rowcount > 0
 
     def close(self) -> None:
         self._conn.close()

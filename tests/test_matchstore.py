@@ -77,3 +77,27 @@ def test_persists_across_connections(tmp_path: Path) -> None:
         s.upsert(_m("PM", "Acme"))
     with MatchStore(db) as s:  # новое соединение видит запись
         assert [r["role"] for r in s.list()] == ["PM"]
+
+
+def test_upsert_from_other_thread(tmp_path: Path) -> None:
+    """Регресс: скоринг апсёртит из параллельных потоков — sqlite не должен падать
+    с «objects created in a thread can only be used in that same thread»."""
+    import threading
+
+    store = MatchStore(tmp_path / "matches.db")
+    errors: list[Exception] = []
+
+    def work(i: int) -> None:
+        try:
+            store.upsert(_m(f"Role{i}", f"Co{i}"))
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=work, args=(i,)) for i in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert not errors, errors
+    assert len(store.list()) == 10  # все 10 из разных потоков сохранились
+    store.close()
