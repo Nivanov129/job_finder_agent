@@ -15,6 +15,15 @@
 
 $ErrorActionPreference = 'Stop'
 
+# В PowerShell 7 ненулевой код нативной команды при ErrorActionPreference='Stop'
+# превращается в терминирующую ошибку. Нам это мешает: мы НАМЕРЕННО проверяем
+# `docker info`/`docker compose version` через $LASTEXITCODE (демон может быть не
+# поднят — это не фатально, мы сами стартуем Docker Desktop). Отключаем, иначе
+# скрипт падал бы на `docker info` с 'npipe ... docker_engine' вместо ожидания.
+if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -Scope Global -ErrorAction SilentlyContinue) {
+  $PSNativeCommandUseErrorActionPreference = $false
+}
+
 # Корень репозитория = каталог скрипта, чтобы запуск работал из любого места.
 $RepoDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $RepoDir
@@ -59,8 +68,14 @@ if ($LASTEXITCODE -ne 0) {
   $dd = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
   if (Test-Path $dd) { Start-Process $dd } else { Start-Process 'Docker Desktop' -ErrorAction SilentlyContinue }
   if (-not (Wait-Docker)) {
-    Write-Err "Docker не поднялся. Открой Docker Desktop вручную, дождись готовности и запусти снова:"
-    Write-Err "  $DockerDesktopUrl"
+    Write-Err "Docker Desktop установлен, но движок не поднялся."
+    Write-Err "Это нормально для ПЕРВОГО запуска — Docker Desktop надо открыть руками:"
+    Write-Err "  1) Открой 'Docker Desktop' из меню Пуск;"
+    Write-Err "  2) прими условия (Accept) при первом запуске;"
+    Write-Err "  3) если попросит — обнови WSL2 и ПЕРЕЗАГРУЗИ компьютер;"
+    Write-Err "  4) дождись, пока значок кита покажет 'Docker Desktop running';"
+    Write-Err "  5) запусти установку снова (та же команда)."
+    Write-Err "Если кита нет — поставь/обнови Docker Desktop вручную: $DockerDesktopUrl"
     exit 1
   }
 }
