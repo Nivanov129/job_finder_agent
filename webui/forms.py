@@ -169,7 +169,10 @@ def engine_config_from_form(
             # Надёжный путь: токен от `claude setup-token` (на своей машине, где
             # работает браузер) — вставляется сюда и пишется в .env. Внутри-
             # контейнерный OAuth-обмен кода часто падает с 400, поэтому даём поле.
-            token = _clean(form.get("claude_token", ""))
+            # Длинный токен при копировании из терминала переносится по ширине окна
+            # → в нём появляются пробелы/переносы. Вычищаем ВСЕ пробельные символы
+            # (сам токен их не содержит), иначе .env/авторизация ломаются.
+            token = re.sub(r"\s+", "", _clean(form.get("claude_token", "")))
             if token:  # секрет — в .env, не в config.json
                 secrets["CLAUDE_CODE_OAUTH_TOKEN"] = token
     elif engine == "ollama":

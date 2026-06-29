@@ -392,12 +392,12 @@ def render_engine(
         active = "codex"
 
     choices = (
-        _engine_choice("claude", "Claude Code", "вход через Anthropic", "подписка",
+        _engine_choice("claude", "Claude Code", "вход через Anthropic", "нужна подписка",
                        active=active == "claude")
-        + _engine_choice("codex", "Codex", "вход через ChatGPT", "подписка",
+        + _engine_choice("codex", "Codex", "вход через ChatGPT", "можно бесплатно",
                          active=active == "codex")
-        + _engine_choice("ollama", "Ollama Cloud", "модель по умолчанию", "нужен ключ",
-                         active=active == "ollama")
+        + _engine_choice("ollama", "Ollama Cloud", "облачная модель, ключ бесплатный",
+                         "бесплатно", active=active == "ollama")
         + _engine_choice("openrouter", "OpenRouter", "бесплатная модель", "бесплатно",
                          active=active == "openrouter")
     )

@@ -287,7 +287,7 @@ def test_engine_page_default_is_codex(client: TestClient) -> None:
         assert value in body
     assert 'value="api_key"' not in body
     assert "Claude Code" in body
-    assert "подписка" in body and "нужен ключ" in body and "бесплатно" in body
+    assert "подписка" in body and "бесплатно" in body
     # статус подтягивается локальным engine.js, без CDN
     assert "/static/js/engine.js" in body
     assert "cdn.jsdelivr.net" not in body
@@ -380,15 +380,16 @@ def test_engine_save_claude_token_to_env(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.json"
     client = TestClient(create_app(config_path=cfg_path))
     _seed_config(client)
+    # токен из терминала часто приходит с переносами/пробелами (перенос по ширине)
     r = client.post(
         "/engine/save",
-        data={"engine": "claude", "claude_token": "sk-ant-oat01-FROMHOST"},
+        data={"engine": "claude", "claude_token": "sk-ant-oat01-FROM\n  HOST tail\t"},
     )
     assert r.status_code == 200
     cfg = load_config(cfg_path)
     assert cfg.scoring_engine == "cli" and cfg.cli_tool == "claude"
-    # токен подписки — секрет в .env, не в config.json
-    assert "CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-FROMHOST" in (
+    # токен подписки — секрет в .env, без пробелов/переносов
+    assert "CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-FROMHOSTtail" in (
         tmp_path / ".env"
     ).read_text(encoding="utf-8")
     assert "CLAUDE_CODE_OAUTH_TOKEN" not in cfg_path.read_text(encoding="utf-8")
