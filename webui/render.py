@@ -504,13 +504,23 @@ def render_telegram(*, has_session: bool = False, saved: list[str] | None = None
 
 
 def render_results_screen() -> str:
-    """Экран «Подборка»: фильтры по направлению + сетка карточек с двойными
-    кольцами. Карточки строит results.js по /run/results (живой прогон)."""
+    """Экран «Подборка»: фильтр по направлению + ползунок минимального совпадения
+    + сетка карточек с двойными кольцами. Карточки и состояние ползунка ведёт
+    results.js по /run/results (живой прогон)."""
     return (
         '<div class="res-bar">'
         '<div class="res-filters" data-res-filters></div>'
         '<a class="btn btn--accent" href="/run/output.xlsx" download>'
         f'{icon("ti-download")} Скачать .xlsx</a></div>'
+        '<div class="res-slider" data-res-slider hidden>'
+        f'<span class="res-slider__head">{icon("ti-adjustments-horizontal")}'
+        "Минимальное совпадение</span>"
+        '<input type="range" min="0" max="100" step="1" value="0" '
+        'class="res-slider__range" data-res-min '
+        'aria-label="минимальное совпадение резюме, %">'
+        '<span class="res-slider__val mono" data-res-minval>0%</span>'
+        '<span class="res-slider__count" data-res-count></span>'
+        "</div>"
         '<div class="res-grid" data-res-grid></div>'
         '<div class="res-empty" data-res-empty hidden>'
         f'{icon("ti-stack-2")}<div>Пока пусто. Запусти «Подбор за период» или '

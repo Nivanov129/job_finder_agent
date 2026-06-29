@@ -4,8 +4,14 @@
   var grid = document.querySelector("[data-res-grid]");
   var empty = document.querySelector("[data-res-empty]");
   var filtersEl = document.querySelector("[data-res-filters]");
+  var sliderEl = document.querySelector("[data-res-slider]");
+  var minEl = document.querySelector("[data-res-min]");
+  var minValEl = document.querySelector("[data-res-minval]");
+  var countEl = document.querySelector("[data-res-count]");
   if (!grid) return;
   var filter = "all";
+  var minPct = 0;
+  var lastData = [];   // последняя выборка с сервера — фильтруем её ползунком без перезапроса
   var last = "";
 
   function esc(s) {
@@ -42,42 +48,54 @@
       '" data-rf="' + esc(key) + '">' + esc(label) + "</button>";
   }
 
-  function render(results) {
+  // Перерисовать сетку из кэша по текущему направлению и порогу ползунка.
+  // Не ходит в сеть — двигать ползунок дёшево.
+  function paint() {
+    var results = lastData;
     if (!results.length) {
       grid.innerHTML = "";
       if (empty) empty.hidden = false;
       if (filtersEl) filtersEl.innerHTML = "";
+      if (sliderEl) sliderEl.hidden = true;
       return;
     }
     if (empty) empty.hidden = true;
+    if (sliderEl) sliderEl.hidden = false;
+
     var tracks = [];
     results.forEach(function (r) { if (r.track && tracks.indexOf(r.track) < 0) tracks.push(r.track); });
     if (filtersEl) filtersEl.innerHTML =
-      chip("Все", "all") + chip("Точные ≥80", "green") + chip("Stretch 70–79", "amber") +
-      tracks.map(function (t) { return chip(t, t); }).join("");
-    var shown = results.filter(function (r) {
-      if (filter === "all") return true;
-      if (filter === "green") return r.resume >= 80;
-      if (filter === "amber") return r.resume >= 70 && r.resume < 80;
-      return r.track === filter;
-    });
+      chip("Все", "all") + tracks.map(function (t) { return chip(t, t); }).join("");
+
+    var byTrack = results.filter(function (r) { return filter === "all" || r.track === filter; });
+    var shown = byTrack.filter(function (r) { return r.resume >= minPct; });
     shown.sort(function (a, b) { return b.resume - a.resume; });
     grid.innerHTML = shown.map(card).join("");
+
+    if (minValEl) minValEl.textContent = minPct + "%";
+    if (countEl) countEl.textContent = "показано " + shown.length + " из " + byTrack.length;
   }
 
   document.addEventListener("click", function (ev) {
     var c = ev.target.closest("[data-rf]");
     if (!c) return;
     filter = c.getAttribute("data-rf");
-    poll(true);
+    paint();
+  });
+
+  if (minEl) minEl.addEventListener("input", function () {
+    minPct = parseInt(minEl.value, 10) || 0;
+    paint();
   });
 
   function poll(force) {
     fetch("/run/results").then(function (r) { return r.json(); }).then(function (d) {
-      var key = JSON.stringify(d.results) + filter;
+      var data = d.results || [];
+      var key = JSON.stringify(data);
       if (!force && key === last) return;
       last = key;
-      render(d.results || []);
+      lastData = data;
+      paint();
     }).catch(function () {});
   }
 
