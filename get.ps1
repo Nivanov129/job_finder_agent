@@ -1,4 +1,4 @@
-﻿# Job Agent — установка одной командой (Windows, PowerShell):
+# Job Agent — установка одной командой (Windows, PowerShell):
 #
 #   irm https://raw.githubusercontent.com/Nivanov129/job_finder_agent/main/get.ps1 | iex
 #
