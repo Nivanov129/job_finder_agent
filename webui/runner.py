@@ -275,11 +275,16 @@ def _default_run(  # pragma: no cover - пайплайн
     # отправить НОВЫЕ вакансии в Telegram-бот владельца. Для разового «Подбора»
     # бот не шлём (результаты и так в UI) — копить незачем.
     finalists: list[Any] = []
+    # Подборку персистим в results.json — её читает MCP-сервер (отдельный процесс)
+    # как list_matches; обновляется и ручным «Подбором», и агент-прогоном.
+    match_dicts: list[dict[str, Any]] = []
 
     def _on_result_er(er: Any) -> None:
         if agent_mode:
             finalists.append(er)
-        on_result(result_to_dict(er))
+        d = result_to_dict(er)
+        match_dicts.append(d)
+        on_result(d)
 
     result = run_pipeline(
         config, since=since, base_dir=base, output_path=out,
@@ -289,6 +294,14 @@ def _default_run(  # pragma: no cover - пайплайн
         on_item=on_item,
     )
     write_last_run(last_run_file, now)
+    try:
+        tmp = base / "results.json.tmp"
+        tmp.write_text(json.dumps(match_dicts, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(base / "results.json")
+    except OSError as exc:
+        logging.getLogger("job_agent.webui.runner").warning(
+            "results.json не записан: %s", str(exc)[:120]
+        )
     if agent_mode and finalists:
         try:
             from .notify import notify_new_vacancies

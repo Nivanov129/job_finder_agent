@@ -17,6 +17,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "pypdf>=6.14.2",
     "segno>=1.6",
+    "mcp>=1.2",
 ]
 
 [project.optional-dependencies]
@@ -25,6 +26,7 @@ native = ["pywebview>=5.0"]
 
 [project.scripts]
 job-agent = "job_agent.cli:main"
+job-agent-mcp = "job_agent.mcp_server:main"
 
 [dependency-groups]
 dev = [
