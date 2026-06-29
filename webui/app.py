@@ -156,6 +156,16 @@ def create_app(
     """
     app = FastAPI(title="Job agent web-UI")
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+    @app.middleware("http")
+    async def _no_stale_static(request: Request, call_next: Any) -> Any:
+        # Статика (js/css) меняется при пересборке образа — заставляем браузер
+        # всегда перепроверять (ETag даёт дешёвый 304), иначе после обновления
+        # выполняется старый закешированный JS и кнопки «не работают».
+        response = await call_next(request)
+        if request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
     target = Path(config_path) if config_path is not None else _DEFAULT_CONFIG_PATH
 
     envfile = target.parent / ".env"
@@ -500,7 +510,7 @@ def create_app(
                     env.get("TELEGRAM_API_ID") and env.get("TELEGRAM_API_HASH")
                 ),
             ),
-            scripts='<script src="/static/js/telegram.js"></script>',
+            scripts='<script src="/static/js/telegram.js?v=qr1"></script>',
             active="/telegram",
         )
 
