@@ -96,6 +96,11 @@
       "default": false,
       "description": "Доп. источник: поиск вакансий на LinkedIn через web-поиск (дорки по ролям). Требует настроенного web_search."
     },
+    "use_embeddings": {
+      "type": "boolean",
+      "default": true,
+      "description": "Локальная модель эмбеддингов для пред-фильтра. false — фильтр только по названию+ролям (без локальной модели, чисто облако)."
+    },
 
     "scoring_engine": {
       "type": "string",

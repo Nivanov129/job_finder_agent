@@ -34,6 +34,7 @@ __all__ = [
     "DEFAULT_LIMIT",
     "MapExample",
     "prefilter_and_route",
+    "route_by_role_only",
 ]
 
 # Мягкий дефолт порога близости: не зафиксирован числом, калибруется на backfill
@@ -117,6 +118,41 @@ def _map_fit_pre(
         return 0
     best = max(embedder.similarity(vacancy_text, text) for text in relevant)
     return _sim_to_percent(best)
+
+
+def route_by_role_only(
+    vacancies: Sequence[Vacancy],
+    tracks: Sequence[Track],
+    *,
+    global_role_gate: Sequence[str] = (),
+    limit: int = DEFAULT_LIMIT,
+) -> list[RoutedVacancy]:
+    """Роутинг БЕЗ эмбеддингов (когда локальная модель отключена).
+
+    Вакансия идёт в первый трек, чей `role_gate` ловит её название (по словам,
+    как в `_passes_role_gate`); не прошла ни один гейт — отброшена. Порога
+    близости нет (эмбеддингов нет), `map_fit_pre=0` (карту посчитает скоринг).
+    Так пайплайн работает чисто на названии+ролях, без локальной модели.
+    """
+    if not tracks:
+        raise ValueError("route_by_role_only: нужен хотя бы один трек")
+    routed: list[RoutedVacancy] = []
+    for vacancy in vacancies:
+        chosen: str | None = None
+        for track in tracks:
+            gate = track.role_gate or global_role_gate
+            if _passes_role_gate(vacancy.title, gate):
+                chosen = track.id
+                break
+        if chosen is None:
+            continue
+        routed.append(
+            RoutedVacancy(
+                vacancy=vacancy, best_track=chosen, best_sim=1.0,
+                map_fit_pre=0, candidate_tracks=[],
+            )
+        )
+    return routed[:limit]
 
 
 def prefilter_and_route(

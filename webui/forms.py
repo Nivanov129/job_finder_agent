@@ -128,6 +128,9 @@ def config_from_form(form: FormLike) -> dict[str, Any]:
         if bot_token:
             data["bot_token"] = bot_token
     data["enable_contacts"] = bool(form.get("enable_contacts"))
+    # Локальный пред-фильтр (модель эмбеддингов). Чекбокс всегда в форме, поэтому
+    # отсутствие = снят = False.
+    data["use_embeddings"] = bool(form.get("use_embeddings"))
 
     return data
 

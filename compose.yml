@@ -26,11 +26,14 @@ services:
       # Долгая загрузка ~2 ГБ без токена легко упирается в таймаут/лимит HF —
       # даём больше времени на запрос; warm_model сам чистит битый кэш и повторяет.
       HF_HUB_DOWNLOAD_TIMEOUT: "60"
-    entrypoint: ["python", "-c"]
+    entrypoint: ["python", "-m"]
     command:
-      - "from job_agent.embeddings import warm_model; warm_model()"
+      # Качаем модель только если в конфиге включены эмбеддинги (use_embeddings).
+      - "job_agent.warm_embeddings"
     volumes:
       - model_cache:/models
+      # Конфиг (read-only) — чтобы знать, нужны ли эмбеддинги.
+      - ${JOB_AGENT_DATA:-./data}:/data:ro
     restart: "no"
 
   # Self-host web-поиск для анализа компании на стадии скоринга.

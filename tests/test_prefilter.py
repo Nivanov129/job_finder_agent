@@ -15,7 +15,18 @@ from job_agent.prefilter import (
     DEFAULT_LIMIT,
     DEFAULT_MIN_SIM,
     prefilter_and_route,
+    route_by_role_only,
 )
+
+
+def test_route_by_role_only_no_embeddings() -> None:
+    # Без эмбеддингов: роутинг по role_gate, без порога близости.
+    tracks = [_track("a", role_gate=["Менеджер продукта"])]
+    kept = _vac("Менеджер по продукту", "VAC")  # проходит роль (по словам)
+    dropped = _vac("Бэкенд-разработчик", "VAC")  # нет такой роли
+    routed = route_by_role_only([kept, dropped], tracks)
+    assert [r.vacancy.title for r in routed] == ["Менеджер по продукту"]
+    assert routed[0].best_track == "a" and routed[0].map_fit_pre == 0
 
 
 class FakeModel:

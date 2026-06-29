@@ -40,7 +40,13 @@ from .enrich.investigator import investigate_contacts
 from .models import EnrichedResult, RawPost
 from .normalize import normalize_posts
 from .output.xlsx import write_xlsx
-from .prefilter import DEFAULT_LIMIT, DEFAULT_MIN_SIM, MapExample, prefilter_and_route
+from .prefilter import (
+    DEFAULT_LIMIT,
+    DEFAULT_MIN_SIM,
+    MapExample,
+    prefilter_and_route,
+    route_by_role_only,
+)
 from .scoring import score_routed
 from .titlefilter import derive_titles, filter_posts_by_titles
 from .websearch import make_searcher
@@ -355,20 +361,29 @@ def run_pipeline(
         # 3. Дедуп (кросс-источник + внутрипрогонный), помечаем виденными.
         fresh = store.filter_new(vacancies)
 
-        # 4. Пре-фильтр + роутинг.
+        # 4. Пре-фильтр + роутинг. Без локальной модели (use_embeddings=false) —
+        # роутинг только по названию+ролям, без эмбеддингов и порога близости.
         examples = map_examples(config, base)
-        routed = prefilter_and_route(
-            fresh,
-            config.tracks,
-            embedder=embedder,
-            track_resumes=track_resumes,
-            search_map_examples=examples,
-            global_role_gate=config.global_role_gate,
-            multi_track=config.multi_track_scoring,
-            multi_track_delta=config.multi_track_delta,
-            min_sim=min_sim,
-            limit=limit,
-        )
+        if config.use_embeddings:
+            routed = prefilter_and_route(
+                fresh,
+                config.tracks,
+                embedder=embedder,
+                track_resumes=track_resumes,
+                search_map_examples=examples,
+                global_role_gate=config.global_role_gate,
+                multi_track=config.multi_track_scoring,
+                multi_track_delta=config.multi_track_delta,
+                min_sim=min_sim,
+                limit=limit,
+            )
+        else:
+            routed = route_by_role_only(
+                fresh,
+                config.tracks,
+                global_role_gate=config.global_role_gate,
+                limit=limit,
+            )
         after_filter = len(routed)
         _report("score", collected=collected, after_filter=after_filter)
 

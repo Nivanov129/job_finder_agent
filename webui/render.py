@@ -219,8 +219,11 @@ def _engine_pointer() -> str:
     )
 
 
-def _output_card(*, threshold: int = 70, enable_contacts: bool = False) -> str:
+def _output_card(
+    *, threshold: int = 70, enable_contacts: bool = False, use_embeddings: bool = True
+) -> str:
     contacts = " checked" if enable_contacts else ""
+    emb = " checked" if use_embeddings else ""
     return (
         '<section class="card">'
         f'<div class="card__title">{icon("ti-arrow-bar-to-down")} Выхлоп</div>'
@@ -232,6 +235,9 @@ def _output_card(*, threshold: int = 70, enable_contacts: bool = False) -> str:
         "this.value+&#39;%&#39;\"></label>"
         f'<label class="chip-toggle"><input type="checkbox" name="enable_contacts"{contacts}>'
         '<span class="chip">Контакт-ассист (черновик, без отправки)</span></label>'
+        f'<label class="chip-toggle"><input type="checkbox" name="use_embeddings"{emb}>'
+        '<span class="chip">Локальный пред-фильтр (модель ~0.22 ГБ; выкл — чисто '
+        "облако, чуть больше AI-вызовов)</span></label>"
         "</section>"
     )
 
@@ -271,6 +277,7 @@ def render_settings(cfg: dict | None = None) -> str:
         + _output_card(
             threshold=int(cfg.get("cover_letter_threshold", 70)),
             enable_contacts=bool(cfg.get("enable_contacts")),
+            use_embeddings=bool(cfg.get("use_embeddings", True)),
         )
         + _footer(int(cfg.get("backfill_days", 14)))
         + "</form>"
