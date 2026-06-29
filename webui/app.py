@@ -241,6 +241,7 @@ def create_app(
             return JSONResponse(
                 {"error": "дай ссылку на вакансию или загрузи PDF"}, status_code=400
             )
+        os.environ.update(parse_env(envfile))  # ключи из .env видны движку
         cfg = load_config(target)
         engine = make_engine(cfg)
         base = target.parent
@@ -445,6 +446,7 @@ def create_app(
         if not text.strip():
             return JSONResponse({"error": "резюме пустое"}, status_code=400)
         try:
+            os.environ.update(parse_env(envfile))  # ключи из .env видны движку
             engine = make_engine(load_config(target))
             roles = await run_in_threadpool(derive_titles, engine, text)
         except Exception as exc:  # движок не авторизован / упал
@@ -607,6 +609,7 @@ def create_app(
             return JSONResponse({"channels": [], "message": "каналы не получены — войдите"})
         job_ids: set[str] = set()
         try:  # классификация опциональна — без движка просто без авто-отметки
+            os.environ.update(parse_env(envfile))  # ключи из .env видны движку
             engine = make_engine(load_config(target))
             job_ids = await run_in_threadpool(classify_channels, engine, channels)
         except Exception:
