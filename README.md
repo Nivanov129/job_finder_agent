@@ -22,8 +22,10 @@ curl -fsSL https://raw.githubusercontent.com/Nivanov129/job_finder_agent/main/ge
 irm https://raw.githubusercontent.com/Nivanov129/job_finder_agent/main/get.ps1 | iex
 ```
 
-Первый запуск идёт 5–15 минут (ставится Docker, качается модель) — это нормально.
-Программа поставится в `~/job-agent`, потом откроется `http://localhost:8766`.
+Первый запуск дольше всего ставит Docker и собирает образ (5–15 мин) — это
+нормально. Сам веб-интерфейс открывается сразу; лёгкая модель пред-фильтра
+(~0.22 ГБ) догружается в фоне (её можно вообще выключить). Программа поставится
+в `~/job-agent`, потом откроется `http://localhost:8766`.
 
 ### Не уверен, как открыть терминал? Спроси ChatGPT
 
