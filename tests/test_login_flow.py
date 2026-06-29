@@ -119,3 +119,22 @@ def test_start_replaces_prior_session(tmp_path: Path) -> None:
     mgr.start("claude")
     mgr.start("claude")  # повторный старт закрывает прежнюю сессию
     assert stopped  # прежний процесс остановлен
+
+
+def test_login_error_re_tolerates_collapsed_whitespace() -> None:
+    """claude рисует TUI позиционированием курсора → после среза ANSI пробелы
+    схлопываются. Детектор ошибки должен ловить и слитные формы (иначе вход
+    зависал на «Завершаю вход…» все 180с)."""
+    from webui.login_flow import LOGIN_ERROR_RE
+
+    for text in (
+        "OAuth error: Request failed with status code 400Press Enter to retry.",
+        "OAutherror: status code 400",  # пробелы съедены TUI
+        "statuscode401",
+        "PressEntertoretry.",
+    ):
+        assert LOGIN_ERROR_RE.search(text), text
+    # на нормальном выводе (ссылка + токен) ложных срабатываний нет
+    assert not LOGIN_ERROR_RE.search(
+        "https://claude.ai/oauth ... token sk-ant-oat01-OKOK"
+    )

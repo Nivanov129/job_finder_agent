@@ -56,8 +56,13 @@ _TOKEN_ENV_KEY: dict[str, str] = {"claude": "CLAUDE_CODE_OAUTH_TOKEN"}
 URL_RE = re.compile(r"https?://[^\s'\"<>]+")
 CLAUDE_TOKEN_RE = re.compile(r"sk-ant-oat[0-9A-Za-z_-]+")
 # Признак неудачного обмена кода (claude печатает это и ждёт «Press Enter to
-# retry», не завершаясь) — чтобы не висеть в ожидании токена 180с.
-LOGIN_ERROR_RE = re.compile(r"OAuth error|Press Enter to retry|status code [45]\d\d", re.I)
+# retry», не завершаясь) — чтобы не висеть в ожидании токена 180с. Пробелы между
+# словами необязательны (`\s*`): claude рисует строки позиционированием курсора,
+# и после срезания ANSI пробелы схлопываются («statuscode400», «PressEntertoretry»)
+# — иначе детектор не срабатывал и вход «зависал» на «Завершаю вход…».
+LOGIN_ERROR_RE = re.compile(
+    r"OAuth\s*error|Press\s*Enter\s*to\s*retry|status\s*code\s*[45]\d\d", re.I
+)
 # Одноразовый device-код codex, напр. «CVBJ-2XUDK».
 DEVICE_CODE_RE = re.compile(r"\b[A-Z0-9]{4,6}-[A-Z0-9]{4,6}\b")
 
