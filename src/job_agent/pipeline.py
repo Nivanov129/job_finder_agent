@@ -396,14 +396,23 @@ def run_pipeline(
             )
             contacts = None
             if config.enable_contacts and contact_searcher is not None:
-                contacts = find_contacts(
-                    rv.vacancy,
-                    engine,
-                    contact_searcher,
-                    track_name=track.name if track is not None else score.track,
-                    enable_contacts=True,
-                    output_lang=config.output_lang,
-                )
+                # Изоляция обогащения: сбой контактов (недоступный web-поиск и т.п.)
+                # НЕ должен выбрасывать уже посчитанную вакансию из выгрузки.
+                try:
+                    contacts = find_contacts(
+                        rv.vacancy,
+                        engine,
+                        contact_searcher,
+                        track_name=track.name if track is not None else score.track,
+                        enable_contacts=True,
+                        output_lang=config.output_lang,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "контакты для «%s» пропущены: %s",
+                        rv.vacancy.title,
+                        str(exc)[:160],
+                    )
             return EnrichedResult(
                 vacancy=rv.vacancy, score=score, cover_letter=cover_letter,
                 contacts=contacts,
