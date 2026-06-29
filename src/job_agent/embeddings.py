@@ -16,7 +16,7 @@ import math
 from collections.abc import Iterable, Sequence
 from typing import Protocol, runtime_checkable
 
-__all__ = ["MODEL_NAME", "EmbeddingModel", "Embedder", "cosine"]
+__all__ = ["MODEL_NAME", "EmbeddingModel", "Embedder", "cosine", "warm_model"]
 
 # Фиксированная мультиязычная модель пре-фильтра. Не конфигурируется — инвариант
 # продукта. fastembed не отдаёт bge-m3, поэтому зафиксирован поддерживаемый
@@ -24,6 +24,47 @@ __all__ = ["MODEL_NAME", "EmbeddingModel", "Embedder", "cosine"]
 MODEL_NAME = "intfloat/multilingual-e5-large"
 
 Vector = tuple[float, ...]
+
+
+def warm_model(retries: int = 3, pause: float = 12.0) -> None:
+    """Скачать/прогреть модель эмбеддингов с устойчивостью к сбоям HF Hub.
+
+    Загрузка ~2 ГБ с HuggingFace без токена иногда отваливается (rate-limit/обрыв)
+    и оставляет ПОВРЕЖДЁННЫЙ кэш — тогда повтор падает мгновенно на загрузке битых
+    файлов. Поэтому при сбое чистим кэш и качаем заново (несколько попыток).
+    Запускается в сервисе `model-init` перед стартом стека.
+    """
+    import os
+    import shutil
+    import sys
+    import time
+
+    from fastembed import TextEmbedding
+
+    cache = os.environ.get("FASTEMBED_CACHE_PATH", "/models")
+    last_err: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            TextEmbedding(model_name=MODEL_NAME)
+            print(f"модель эмбеддингов готова: {MODEL_NAME}", flush=True)
+            return
+        except Exception as exc:  # сеть/HF/битый кэш
+            last_err = exc
+            print(
+                f"[{attempt}/{retries}] не удалось скачать модель: "
+                f"{str(exc)[:200]}",
+                file=sys.stderr,
+                flush=True,
+            )
+            # снести частичный/битый кэш, чтобы следующая попытка качала чисто
+            if os.path.isdir(cache):
+                for name in os.listdir(cache):
+                    shutil.rmtree(os.path.join(cache, name), ignore_errors=True)
+            if attempt < retries:
+                time.sleep(pause)
+    raise SystemExit(
+        f"не удалось скачать модель эмбеддингов за {retries} попыток: {last_err}"
+    )
 
 
 @runtime_checkable

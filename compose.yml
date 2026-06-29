@@ -23,9 +23,12 @@ services:
     image: job-agent:latest
     environment:
       FASTEMBED_CACHE_PATH: /models
+      # Долгая загрузка ~2 ГБ без токена легко упирается в таймаут/лимит HF —
+      # даём больше времени на запрос; warm_model сам чистит битый кэш и повторяет.
+      HF_HUB_DOWNLOAD_TIMEOUT: "60"
     entrypoint: ["python", "-c"]
     command:
-      - "from fastembed import TextEmbedding; from job_agent.embeddings import MODEL_NAME; TextEmbedding(model_name=MODEL_NAME); print('embedding model ready:', MODEL_NAME)"
+      - "from job_agent.embeddings import warm_model; warm_model()"
     volumes:
       - model_cache:/models
     restart: "no"
