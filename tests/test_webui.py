@@ -169,8 +169,8 @@ def test_settings_screen_inventory(client: TestClient) -> None:
     assert 'name="engine"' not in body  # карточек движка на Настройке больше нет
     # верхнее меню-навигация присутствует на экране
     assert 'class="nav"' in body and "AI · авторизация" in body
-    # выхлоп: чипы и слайдер порога с живым %
-    assert 'name="out_table"' in body and 'name="out_bot"' in body
+    # выхлоп: слайдер порога с живым % (бот-выгрузка убрана)
+    assert 'name="out_bot"' not in body and 'name="bot_token"' not in body
     assert 'name="cover_threshold"' in body
     assert "70%" in body
     # низ: сохранить + запустить backfill
@@ -297,9 +297,6 @@ def _single_track_form() -> dict[str, str]:
         "track_roles": "Backend Engineer, Tech Lead",
         "engine": "cli",
         "cli_tool": "claude",
-        "out_table": "on",
-        "out_bot": "on",
-        "bot_token": "123:abc",
         "cover_threshold": "75",
         "use_aggregators": "on",
         "search_map_path": "./search-map.md",
@@ -321,7 +318,7 @@ def test_save_single_track_writes_valid_config(tmp_path: Path) -> None:
     assert cfg.tracks[0].name == "Backend"
     assert cfg.tracks[0].id == "backend"
     assert cfg.tracks[0].role_gate == ["Backend Engineer", "Tech Lead"]
-    assert cfg.output_mode == "both"
+    assert cfg.output_mode == "table"  # бот-выгрузка убрана → всегда таблица
     assert cfg.cover_letter_threshold == 75
     assert cfg.scoring_engine == "cli" and cfg.cli_tool == "codex"
 

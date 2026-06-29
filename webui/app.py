@@ -119,7 +119,7 @@ _TITLES: dict[str, tuple[str, str]] = {
     "/contacts": ("Поиск контактов", "контакты к конкретной вакансии — даже не из агента"),
     "/": ("Настройка", "направления, источники и выхлоп"),
     "/engine": ("Движок AI", "твой AI считает каждое совпадение локально"),
-    "/telegram": ("Telegram", "каналы-источники и бот для выдачи"),
+    "/telegram": ("Telegram", "вход в аккаунт и каналы-источники"),
 }
 
 
@@ -215,7 +215,7 @@ def create_app(
         # достаём сами (нормализация движком), затем — контакты + опц. инвестигатор.
         from job_agent.enrich.contacts import find_contacts
         from job_agent.enrich.investigator import investigate_contacts
-        from job_agent.models import RawPost
+        from job_agent.models import RawPost, Vacancy
         from job_agent.normalize import normalize_post
         from job_agent.pipeline import _read_document
         from job_agent.websearch import make_searcher
@@ -223,8 +223,13 @@ def create_app(
         form = await request.form()
         link = str(form.get("link", "")).strip()
         path = str(form.get("path", "")).strip()
+        role = str(form.get("role", "")).strip()
+        company = str(form.get("company", "")).strip()
         want_inv = str(form.get("investigator", "")).lower() in ("on", "true", "1")
-        if not link and not path:
+        # Кнопка «Контакт» в карточке подборки уже знает должность+компанию —
+        # тогда не тянем/не нормализуем, ищем сразу по ним.
+        direct = bool(role and company)
+        if not link and not path and not direct:
             return JSONResponse(
                 {"error": "дай ссылку на вакансию или загрузи PDF"}, status_code=400
             )
@@ -233,24 +238,30 @@ def create_app(
         base = target.parent
 
         def _run() -> dict[str, Any]:
-            # 1) текст вакансии: из PDF/файла или со страницы по ссылке
-            try:
-                if path:
-                    text = _read_document(path, base)
-                else:
-                    text = _fetch_url_text(link)
-            except Exception as exc:
-                return {"error": f"не прочитать вакансию: {str(exc)[:160]}"}
-            if not text.strip():
-                return {"error": "пусто — со страницы не вытащить текст, загрузи PDF"}
-            # 2) достаём должность+компанию нормализацией
-            post = RawPost(raw_text=text[:8000], source="manual", url=link or None)
-            vacs = normalize_post(post, engine, output_lang=cfg.output_lang)
-            if not vacs:
-                return {"error": "не распознал вакансию в тексте"}
-            vac = vacs[0]
-            if link and not vac.url:
-                vac = vac.model_copy(update={"url": link})
+            if direct:
+                vac = Vacancy(
+                    title=role, company=company,
+                    link_or_contact=link or None, url=link or None,
+                )
+            else:
+                # 1) текст вакансии: из PDF/файла или со страницы по ссылке
+                try:
+                    if path:
+                        text = _read_document(path, base)
+                    else:
+                        text = _fetch_url_text(link)
+                except Exception as exc:
+                    return {"error": f"не прочитать вакансию: {str(exc)[:160]}"}
+                if not text.strip():
+                    return {"error": "пусто — со страницы не вытащить текст, загрузи PDF"}
+                # 2) достаём должность+компанию нормализацией
+                post = RawPost(raw_text=text[:8000], source="manual", url=link or None)
+                vacs = normalize_post(post, engine, output_lang=cfg.output_lang)
+                if not vacs:
+                    return {"error": "не распознал вакансию в тексте"}
+                vac = vacs[0]
+                if link and not vac.url:
+                    vac = vac.model_copy(update={"url": link})
             out: dict[str, Any] = {
                 "detected": {"role": vac.title, "company": vac.company or ""},
                 "contacts": None,

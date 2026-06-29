@@ -40,7 +40,10 @@
       '<div class="res-card__gap">' + esc(r.gap) + "</div>" +
       investigatorBlock(r.investigation) +
       '<div class="res-card__btns">' + open + letter +
-      '<button class="res-btn"><i class="ti ti-user-search"></i>Контакт</button></div></div>'
+      '<button class="res-btn" data-find-contact data-role="' + esc(r.role) +
+      '" data-company="' + esc(r.company) + '" data-link="' + esc(r.link || "") +
+      '"><i class="ti ti-user-search"></i>Контакт</button></div>' +
+      '<div class="res-card__contacts" data-card-contacts hidden></div></div>'
     );
   }
 
@@ -106,6 +109,43 @@
     if (!c) return;
     filter = c.getAttribute("data-rf");
     paint();
+  });
+
+  // «Контакт» в карточке: ищем контакты по должности+компании прямо здесь.
+  document.addEventListener("click", function (ev) {
+    var btn = ev.target.closest("[data-find-contact]");
+    if (!btn) return;
+    var box = btn.closest(".res-card").querySelector("[data-card-contacts]");
+    if (box && !box.hidden && box.getAttribute("data-loaded")) { box.hidden = true; box.removeAttribute("data-loaded"); return; }
+    if (box) { box.hidden = false; box.innerHTML = '<div class="contact-block__sub"><span class="spin"></span> Ищу контакты…</div>'; }
+    btn.disabled = true;
+    var fd = new FormData();
+    fd.append("role", btn.getAttribute("data-role") || "");
+    fd.append("company", btn.getAttribute("data-company") || "");
+    fd.append("link", btn.getAttribute("data-link") || "");
+    fetch("/contacts/search", { method: "POST", body: fd })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (res) {
+        if (!res.ok) throw new Error(res.body.error || "ошибка");
+        var c = res.body.contacts || {};
+        var cands = (c.candidates || []).map(function (x) {
+          return '<div class="inv-row"><div class="inv-row__main"><div class="inv-row__name">' +
+            (x.link ? '<a href="' + esc(x.link) + '" target="_blank" rel="noopener">' + esc(x.name) + "</a>" : esc(x.name)) +
+            (x.role ? " · " + esc(x.role) : "") + "</div>" +
+            (x.source ? '<span class="inv-row__route">' + esc(x.source) + "</span>" : "") + "</div></div>";
+        }).join("");
+        var fb = (c.fallback_paths || []).length
+          ? '<div class="contact-block__sub">Куда смотреть: ' + c.fallback_paths.map(esc).join(" · ") + "</div>" : "";
+        var draft = c.draft_message
+          ? '<details class="inv"><summary class="inv__head"><i class="ti ti-mail"></i>Черновик обращения</summary>' +
+            '<div class="inv__list"><textarea class="input contact-draft__text" rows="5" readonly>' + esc(c.draft_message) + "</textarea></div></details>" : "";
+        if (box) {
+          box.innerHTML = (cands || '<div class="contact-block__sub">Прямых контактов не нашлось.</div>') + fb + draft;
+          box.setAttribute("data-loaded", "1");
+        }
+      })
+      .catch(function (err) { if (box) box.innerHTML = '<div class="contact-block__sub">✗ ' + esc(err.message) + "</div>"; })
+      .finally(function () { btn.disabled = false; });
   });
 
   if (minEl) minEl.addEventListener("input", function () {

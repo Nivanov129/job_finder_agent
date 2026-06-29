@@ -806,6 +806,8 @@ textarea.input {
 .verdict .ti { font-size: 16px; }
 .res-card__gap { font-size: 11.5px; color: var(--text-muted); line-height: 1.5; min-height: 34px; }
 .res-card__btns { display: flex; gap: 7px; margin-top: 13px; flex-wrap: wrap; }
+.res-card__contacts { margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+.res-card__contacts .spin { display: inline-block; vertical-align: -2px; margin-right: 5px; }
 /* доп. выдача инвестигатора контактов */
 .inv { margin-top: 10px; border: 0.5px solid var(--border); border-radius: 10px; background: var(--surface-sub); }
 .inv__head { display: flex; align-items: center; gap: 7px; padding: 8px 11px; font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; list-style: none; }

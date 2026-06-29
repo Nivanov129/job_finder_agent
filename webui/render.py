@@ -219,28 +219,12 @@ def _engine_pointer() -> str:
     )
 
 
-def _output_card(
-    *, out_table: bool = True, out_bot: bool = True, threshold: int = 70,
-    enable_contacts: bool = False, has_bot_token: bool = False,
-) -> str:
-    tbl = " checked" if out_table else ""
-    bot = " checked" if out_bot else ""
+def _output_card(*, threshold: int = 70, enable_contacts: bool = False) -> str:
     contacts = " checked" if enable_contacts else ""
-    token_note = ' <span class="hint-set">задан ✓</span>' if has_bot_token else ""
     return (
         '<section class="card">'
         f'<div class="card__title">{icon("ti-arrow-bar-to-down")} Выхлоп</div>'
-        '<div class="field__label">Куда выгружать</div>'
-        f'<label class="chip-toggle"><input type="checkbox" name="out_table"{tbl}>'
-        f'<span class="chip {"chip--on" if out_table else ""}">'
-        f'{icon("ti-table")} Таблица .xlsx</span></label>'
-        f'<label class="chip-toggle"><input type="checkbox" name="out_bot"{bot}>'
-        f'<span class="chip {"chip--on" if out_bot else ""}">'
-        f'{icon("ti-brand-telegram")} Telegram-бот</span></label>'
-        '<label class="field"><span class="field__label">Telegram bot token (секрет)'
-        f"{token_note}</span>"
-        '<input class="input" name="bot_token" type="password" placeholder="от @BotFather">'
-        "</label>"
+        '<div class="card__meta">Результаты — в «Подборку» и таблицу .xlsx.</div>'
         '<label class="field"><span class="field__label">Сопроводительное — порог '
         f'<output id="threshold-val">{threshold}%</output></span>'
         '<input type="range" class="slider" name="cover_threshold" min="0" max="100" '
@@ -278,7 +262,6 @@ def render_settings(cfg: dict | None = None) -> str:
         for c in (cfg.get("tg_channels") or [])
         if c.get("private")
     ]
-    mode = cfg.get("output_mode", "both")
     return (
         _warning()
         + '<form method="post" action="/save">'
@@ -286,11 +269,8 @@ def render_settings(cfg: dict | None = None) -> str:
         + _sources_card(cfg.get("use_aggregators", True), private_handles)
         + _engine_pointer()
         + _output_card(
-            out_table=mode in ("table", "both"),
-            out_bot=mode in ("bot", "both"),
             threshold=int(cfg.get("cover_letter_threshold", 70)),
             enable_contacts=bool(cfg.get("enable_contacts")),
-            has_bot_token=bool(cfg.get("bot_token")),
         )
         + _footer(int(cfg.get("backfill_days", 14)))
         + "</form>"
