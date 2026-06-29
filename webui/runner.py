@@ -247,6 +247,7 @@ def _default_run(  # pragma: no cover - пайплайн
     from datetime import timedelta
 
     from job_agent.config import load_config
+    from job_agent.dedup import SeenStore
     from job_agent.pipeline import run_pipeline
 
     from .env_store import parse_env
@@ -255,6 +256,11 @@ def _default_run(  # pragma: no cover - пайплайн
     os.environ.update(parse_env(base / ".env"))
     config = load_config(config_path)
     last_run_file = base / "last_run.json"
+    # Seen-дедуп нужен АГЕНТУ (не переоценивать/не пушить одно и то же между
+    # прогонами). Для разового «Подбора за период» он вреден: пользователь хочет
+    # ВСЕ совпадения периода каждый раз — поэтому даём свежий in-memory store
+    # (дедуп только внутри прогона, без памяти между прогонами).
+    seen_store = None if agent_mode else SeenStore(":memory:")
 
     now = datetime.now(UTC)
     last = read_last_run(last_run_file)
@@ -266,6 +272,7 @@ def _default_run(  # pragma: no cover - пайплайн
     out = base / "backfill.xlsx"
     result = run_pipeline(
         config, since=since, base_dir=base, output_path=out,
+        seen_store=seen_store,
         on_progress=on_progress,
         on_result=lambda er: on_result(result_to_dict(er)),
         on_item=on_item,
