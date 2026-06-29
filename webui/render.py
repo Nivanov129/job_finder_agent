@@ -535,25 +535,24 @@ def render_contacts() -> str:
     основная выдача (contacts) + инвестигатор. Поток ведёт contacts.js."""
     note = (
         '<div class="run-banner">'
-        f'{icon("ti-info-circle")}<div>Нашёл вакансию мимо агента? Впиши должность и '
-        "компанию — найду, кому написать: рекрутёры и нанимающие, с маршрутом связи "
-        "и черновиком. Отправки нет, только данные.</div></div>"
+        f'{icon("ti-info-circle")}<div>Нашёл вакансию мимо агента? Просто дай '
+        "<b>ссылку</b> или загрузи <b>PDF</b> с описанием — должность и компанию "
+        "определю сам, потом найду, кому написать. Отправки нет, только данные.</div></div>"
     )
     form = (
         '<section class="card"><form class="contact-form" data-contact-form>'
-        '<div class="contact-form__row">'
-        '<label class="field"><span class="field__label">Должность *</span>'
-        '<input class="input" name="role" required '
-        'placeholder="напр. Senior Product Manager"></label>'
-        '<label class="field"><span class="field__label">Компания *</span>'
-        '<input class="input" name="company" required placeholder="напр. Avito"></label>'
-        "</div>"
-        '<div class="contact-form__row">'
-        '<label class="field"><span class="field__label">Регион (опц.)</span>'
-        '<input class="input" name="region" placeholder="напр. Москва / Remote"></label>'
-        '<label class="field"><span class="field__label">Ссылка на вакансию (опц.)</span>'
-        '<input class="input" name="link" placeholder="https://…"></label>'
-        "</div>"
+        '<label class="field"><span class="field__label">Ссылка на вакансию</span>'
+        '<input class="input" name="link" data-contact-link '
+        'placeholder="https://hh.ru/vacancy/… · career.habr.com · t.me/…"></label>'
+        '<div class="contact-or"><span>или</span></div>'
+        '<label class="field"><span class="field__label">PDF / текст с описанием '
+        "вакансии</span>"
+        '<div class="contact-file">'
+        '<button type="button" class="btn" data-contact-pick>'
+        f'{icon("ti-upload")} Загрузить файл</button>'
+        '<input type="file" accept=".pdf,.txt,.md" data-contact-file hidden>'
+        '<span class="contact-file__name" data-contact-fname></span>'
+        '<input type="hidden" name="path" data-contact-path></div></label>'
         '<label class="field contact-form__check"><input type="checkbox" '
         'name="investigator"> Глубокое расследование (инвестигатор · web-обход, '
         "минуты)</label>"
@@ -563,6 +562,7 @@ def render_contacts() -> str:
     )
     result = (
         '<div class="contact-status" data-contact-status hidden></div>'
+        '<div class="contact-detected" data-contact-detected hidden></div>'
         '<div data-contact-result></div>'
     )
     return note + form + result

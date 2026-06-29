@@ -56,7 +56,25 @@ _UPLOAD_DIRS = {
     "resume": "resumes",
     "template": "cover-templates",
     "search_map": "search-map",
+    "vacancy": "vacancies-in",
 }
+
+
+def _fetch_url_text(url: str, *, timeout: float = 20.0) -> str:
+    """Скачать страницу вакансии и грубо вытащить текст (без тегов/скриптов)."""
+    import httpx
+
+    resp = httpx.get(
+        url,
+        follow_redirects=True,
+        timeout=timeout,
+        headers={"User-Agent": "Mozilla/5.0 (job-agent)"},
+    )
+    resp.raise_for_status()
+    html = resp.text
+    html = re.sub(r"(?is)<(script|style|noscript)[^>]*>.*?</\1>", " ", html)
+    text = re.sub(r"(?s)<[^>]+>", " ", html)
+    return re.sub(r"\s+", " ", text).strip()
 
 #: Потолок размера загрузки (UI бывает открыт в LAN — без авторизации).
 _MAX_UPLOAD_BYTES = 25 * 1024 * 1024
@@ -193,38 +211,58 @@ def create_app(
 
     @app.post("/contacts/search")
     async def contacts_search(request: Request) -> JSONResponse:
-        # Контакты к одной вакансии по запросу: основная выдача (find_contacts) +
-        # опц. инвестигатор. Движок и web-поиск — те же, что у пайплайна.
+        # Супер-простой вход: ссылка ИЛИ PDF с вакансией. Должность и компанию
+        # достаём сами (нормализация движком), затем — контакты + опц. инвестигатор.
         from job_agent.enrich.contacts import find_contacts
         from job_agent.enrich.investigator import investigate_contacts
-        from job_agent.models import Vacancy
+        from job_agent.models import RawPost
+        from job_agent.normalize import normalize_post
+        from job_agent.pipeline import _read_document
         from job_agent.websearch import make_searcher
 
         form = await request.form()
-        role = str(form.get("role", "")).strip()
-        company = str(form.get("company", "")).strip()
-        region = str(form.get("region", "")).strip()
         link = str(form.get("link", "")).strip()
+        path = str(form.get("path", "")).strip()
         want_inv = str(form.get("investigator", "")).lower() in ("on", "true", "1")
-        if not role or not company:
+        if not link and not path:
             return JSONResponse(
-                {"error": "нужны должность и компания"}, status_code=400
+                {"error": "дай ссылку на вакансию или загрузи PDF"}, status_code=400
             )
-        vac = Vacancy(
-            title=role, company=company,
-            link_or_contact=link or None, url=link or None,
-        )
         cfg = load_config(target)
         engine = make_engine(cfg)
+        base = target.parent
 
         def _run() -> dict[str, Any]:
-            out: dict[str, Any] = {"contacts": None, "investigation": None}
+            # 1) текст вакансии: из PDF/файла или со страницы по ссылке
             try:
-                searcher = make_searcher(cfg)
+                if path:
+                    text = _read_document(path, base)
+                else:
+                    text = _fetch_url_text(link)
+            except Exception as exc:
+                return {"error": f"не прочитать вакансию: {str(exc)[:160]}"}
+            if not text.strip():
+                return {"error": "пусто — со страницы не вытащить текст, загрузи PDF"}
+            # 2) достаём должность+компанию нормализацией
+            post = RawPost(raw_text=text[:8000], source="manual", url=link or None)
+            vacs = normalize_post(post, engine, output_lang=cfg.output_lang)
+            if not vacs:
+                return {"error": "не распознал вакансию в тексте"}
+            vac = vacs[0]
+            if link and not vac.url:
+                vac = vac.model_copy(update={"url": link})
+            out: dict[str, Any] = {
+                "detected": {"role": vac.title, "company": vac.company or ""},
+                "contacts": None,
+                "investigation": None,
+            }
+            if not (vac.company or "").strip():
+                out["warning"] = "компанию не нашёл — контакты ищу по названию"
+            # 3) контакты
+            try:
                 res = find_contacts(
-                    vac, engine, searcher, track_name=role,
-                    enable_contacts=True, region=region,
-                    output_lang=cfg.output_lang,
+                    vac, engine, make_searcher(cfg), track_name=vac.title,
+                    enable_contacts=True, output_lang=cfg.output_lang,
                 )
                 out["contacts"] = res.model_dump() if res is not None else None
             except Exception as exc:
@@ -232,9 +270,8 @@ def create_app(
             if want_inv:
                 try:
                     inv = investigate_contacts(
-                        vac, engine, track_name=role,
-                        enable_investigator=True, region=region,
-                        output_lang=cfg.output_lang,
+                        vac, engine, track_name=vac.title,
+                        enable_investigator=True, output_lang=cfg.output_lang,
                     )
                     out["investigation"] = inv.model_dump() if inv is not None else None
                 except Exception as exc:
@@ -242,7 +279,8 @@ def create_app(
             return out
 
         result = await run_in_threadpool(_run)
-        return JSONResponse(result)
+        status = 400 if "error" in result else 200
+        return JSONResponse(result, status_code=status)
 
     @app.get("/engine", response_class=HTMLResponse)
     def engine() -> str:

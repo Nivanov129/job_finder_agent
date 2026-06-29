@@ -54,9 +54,9 @@ def test_contacts_page_renders(client: TestClient) -> None:
     assert "/static/js/contacts.js" in body
 
 
-def test_contacts_search_requires_role_and_company(client: TestClient) -> None:
-    # без обязательных полей — 400, без обращения к движку/сети
-    r = client.post("/contacts/search", data={"role": "", "company": ""})
+def test_contacts_search_requires_link_or_file(client: TestClient) -> None:
+    # без ссылки и без файла — 400, без обращения к движку/сети
+    r = client.post("/contacts/search", data={"link": "", "path": ""})
     assert r.status_code == 400
 
 
