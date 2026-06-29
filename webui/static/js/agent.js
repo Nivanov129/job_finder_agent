@@ -81,7 +81,13 @@
     var rate = $("[data-agent-rate]");
     if (feed) {
       var rows = "";
-      if (run.status === "running") rows += feedRow({ role: "новый пост", company: run.stage === "score" ? "скоринг…" : "сбор/нормализация…" }, true);
+      if (run.status === "running") {
+        var fresh = run.feed && run.feed[0];
+        var scanItem = fresh
+          ? { role: fresh.role, company: fresh.company, src: fresh.src }
+          : { role: "новый пост", company: run.stage === "score" ? "скоринг…" : "сбор/нормализация…" };
+        rows += feedRow(scanItem, true);
+      }
       var recent = results.slice().reverse().slice(0, 6);
       rows += recent.map(function (r) { return feedRow(r, false); }).join("");
       feed.innerHTML = rows ||
