@@ -84,5 +84,6 @@ def test_similarity_uses_cache():
 
 
 def test_fixed_model_name():
-    assert MODEL_NAME == "intfloat/multilingual-e5-large"
+    # Лёгкая мультиязычная модель пре-фильтра (~0.22 ГБ), а не e5-large (2.24 ГБ).
+    assert MODEL_NAME == "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     assert Embedder().model_name == MODEL_NAME
