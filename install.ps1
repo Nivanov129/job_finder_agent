@@ -1,4 +1,4 @@
-# Job Agent — тонкий установщик (Windows, PowerShell).
+﻿# Job Agent — тонкий установщик (Windows, PowerShell).
 #
 # Что делает:
 #   1. проверяет, что Docker установлен и демон запущен (нет → ссылка на Docker
