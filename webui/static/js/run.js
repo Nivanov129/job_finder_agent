@@ -28,6 +28,8 @@
     if (ev.target.closest("[data-run-start]")) {
       var fd = new FormData();
       fd.append("days", String(days));
+      var notifyEl = document.querySelector("[data-run-notify]");
+      if (notifyEl && notifyEl.checked) fd.append("notify", "on");
       fetch("/run/start", { method: "POST", body: fd }).then(poll);
     }
   });

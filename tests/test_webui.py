@@ -545,7 +545,7 @@ def test_save_backfill_starts_run_and_shows_run_page(tmp_path: Path) -> None:
 
     started: list[str] = []
 
-    def _fake_run(p, prog, res, item, agent):
+    def _fake_run(p, prog, res, item, agent, notify=False):
         started.append(str(p))
         return {"written": 0}
 
@@ -700,7 +700,7 @@ def test_agent_start_stop_status(tmp_path: Path) -> None:
 
     from webui.runner import BackfillRunner
 
-    runner = BackfillRunner(run=lambda p, prog, res, item, agent: {})
+    runner = BackfillRunner(run=lambda p, prog, res, item, agent, notify=False: {})
     client = TestClient(
         create_app(config_path=tmp_path / "config.json", backfill_runner=runner)
     )

@@ -762,7 +762,9 @@ def create_app(
             _merge_and_validate({"backfill_days": days}, target)
         except ConfigError:
             pass
-        ok = runner.start(target)
+        # Галочка «слать новые вакансии в Telegram-бот» (no-op, если бот не подключён).
+        notify = str(form.get("notify", "")).lower() in ("on", "true", "1")
+        ok = runner.start(target, notify=notify)
         return JSONResponse({"ok": ok, "days": days, "running": runner.is_running()})
 
     @app.post("/agent/start")

@@ -67,7 +67,7 @@ class RunState:
 ProgressFn = Callable[[str, dict[str, int]], None]
 ResultFn = Callable[[dict[str, Any]], None]
 ItemFn = Callable[[dict[str, Any]], None]
-BackfillFn = Callable[[Path, ProgressFn, ResultFn, ItemFn, bool], dict[str, Any]]
+BackfillFn = Callable[[Path, ProgressFn, ResultFn, ItemFn, bool, bool], dict[str, Any]]
 
 _FEED_MAX = 24  # сколько последних «прочитанных/оцениваемых» постов держим в ленте
 
@@ -112,8 +112,14 @@ class BackfillRunner:
         with self._lock:
             return self._state.status == "running"
 
-    def start(self, config_path: Path | str, *, agent_mode: bool = False) -> bool:
-        """Запустить прогон. False — если уже идёт (не запускаем второй)."""
+    def start(
+        self, config_path: Path | str, *, agent_mode: bool = False, notify: bool = False
+    ) -> bool:
+        """Запустить прогон. False — если уже идёт (не запускаем второй).
+
+        `notify=True` — слать финалистов в Telegram-бот и при ручном прогоне
+        (галочка в UI); агент-режим шлёт всегда.
+        """
         with self._lock:
             if self._state.status == "running":
                 return False
@@ -121,7 +127,7 @@ class BackfillRunner:
             self._results = []  # новый прогон — сбрасываем результаты
             self._feed = []  # и живую ленту
         threading.Thread(
-            target=self._worker, args=(Path(config_path), agent_mode), daemon=True
+            target=self._worker, args=(Path(config_path), agent_mode, notify), daemon=True
         ).start()
         return True
 
@@ -165,10 +171,11 @@ class BackfillRunner:
                 if key in counts:
                     setattr(self._state, key, counts[key])
 
-    def _worker(self, config_path: Path, agent_mode: bool) -> None:
+    def _worker(self, config_path: Path, agent_mode: bool, notify: bool = False) -> None:
         try:
             res = self._run(
-                config_path, self._on_progress, self._on_result, self._on_item, agent_mode
+                config_path, self._on_progress, self._on_result, self._on_item,
+                agent_mode, notify,
             )
             new = RunState(status="done", message="готово")
             new.collected = int(res.get("collected", 0))
@@ -222,6 +229,7 @@ def _default_run(  # pragma: no cover - пайплайн
     on_result: ResultFn,
     on_item: ItemFn,
     agent_mode: bool = False,
+    notify: bool = False,
 ) -> dict[str, Any]:
     """Боевой прогон: грузит конфиг и гоняет пайплайн, пишет .xlsx рядом.
 
@@ -257,8 +265,9 @@ def _default_run(  # pragma: no cover - пайплайн
         since = now - timedelta(days=config.backfill_days)
 
     out = base / "backfill.xlsx"
-    # В агент-режиме копим финалистов (EnrichedResult), чтобы после прогона
-    # отправить НОВЫЕ вакансии в Telegram-бот владельца.
+    # Шлём финалистов в Telegram-бот, если агент-режим ИЛИ ручной прогон с
+    # галочкой «слать в ТГ». Копим EnrichedResult только когда это нужно.
+    should_notify = agent_mode or notify
     finalists: list[Any] = []
     # Подборку накапливаем в локальной БД (matches.db): апсёрт по мере оценки —
     # подборка растёт и сразу видна в UI/MCP, а не перетирается прогоном.
@@ -267,7 +276,7 @@ def _default_run(  # pragma: no cover - пайплайн
     store = MatchStore(base / "matches.db")
 
     def _on_result_er(er: Any) -> None:
-        if agent_mode:
+        if should_notify:
             finalists.append(er)
         d = result_to_dict(er)
         try:
@@ -289,7 +298,7 @@ def _default_run(  # pragma: no cover - пайплайн
     finally:
         store.close()
     write_last_run(last_run_file, now)
-    if agent_mode and finalists:
+    if should_notify and finalists:
         try:
             from .notify import notify_new_vacancies
 

@@ -17,7 +17,7 @@ def _wait(runner: BackfillRunner, timeout: float = 2.0) -> None:
 
 def test_runner_done_with_counters(tmp_path: Path) -> None:
     runner = BackfillRunner(
-        run=lambda p, prog, res, item, agent: {
+        run=lambda p, prog, res, item, agent, notify=False: {
             "collected": 5, "after_filter": 3, "written": 2, "output": "backfill.xlsx"
         }
     )
@@ -30,7 +30,7 @@ def test_runner_done_with_counters(tmp_path: Path) -> None:
 
 
 def test_runner_error_surfaces_message(tmp_path: Path) -> None:
-    def boom(p: Path, prog, res, item, agent) -> dict:
+    def boom(p: Path, prog, res, item, agent, notify=False) -> dict:
         raise RuntimeError("резюме не найдено")
 
     runner = BackfillRunner(run=boom)
@@ -44,7 +44,7 @@ def test_runner_error_surfaces_message(tmp_path: Path) -> None:
 def test_runner_progress_updates_state(tmp_path: Path) -> None:
     gate = threading.Event()
 
-    def run(p: Path, prog, res, item, agent) -> dict:
+    def run(p: Path, prog, res, item, agent, notify=False) -> dict:
         prog("normalize", {"collected": 7})
         item({"phase": "read", "role": "Product Manager", "company": "Avito"})
         gate.wait(2.0)
@@ -78,7 +78,7 @@ def test_last_run_roundtrip(tmp_path: Path) -> None:
 def test_agent_triggers_run_in_agent_mode(tmp_path: Path) -> None:
     calls: list[bool] = []
 
-    def run(p: Path, prog, res, item, agent) -> dict:
+    def run(p: Path, prog, res, item, agent, notify=False) -> dict:
         calls.append(agent)
         return {}
 
@@ -96,7 +96,7 @@ def test_agent_triggers_run_in_agent_mode(tmp_path: Path) -> None:
 def test_runner_single_run_at_a_time(tmp_path: Path) -> None:
     gate = threading.Event()
 
-    def blocking(p: Path, prog, res, item, agent) -> dict:
+    def blocking(p: Path, prog, res, item, agent, notify=False) -> dict:
         gate.wait(2.0)
         return {"collected": 1}
 
@@ -133,3 +133,21 @@ def test_runner_archive_via_store(tmp_path: Path) -> None:
 def test_runner_empty_results_without_dir_or_db(tmp_path: Path) -> None:
     assert BackfillRunner().results() == []
     assert BackfillRunner(results_dir=tmp_path).results() == []  # БД нет
+
+
+def test_runner_threads_notify_flag(tmp_path: Path) -> None:
+    """start(notify=True) пробрасывает флаг в прогон (ручной «слать в ТГ»)."""
+    seen: dict[str, bool] = {}
+
+    def run(p: Path, prog, res, item, agent, notify=False) -> dict:
+        seen["notify"] = notify
+        return {}
+
+    runner = BackfillRunner(run=run)
+    runner.start(tmp_path / "c.json", notify=True)
+    for _ in range(200):
+        if "notify" in seen:
+            break
+        time.sleep(0.01)
+    _wait(runner)
+    assert seen.get("notify") is True

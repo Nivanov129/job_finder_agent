@@ -772,6 +772,9 @@ def render_run(agent_interval: int = 30, days: int = 7) -> str:
         '<div data-run-idle>'
         '<section class="card"><div class="run-idle__title">За какой период собрать</div>'
         f'<div class="period-row">{chips}</div>'
+        '<label class="chip-toggle"><input type="checkbox" data-run-notify>'
+        f'<span class="chip">{icon("ti-brand-telegram")} слать новые вакансии в '
+        "Telegram-бот</span></label>"
         '<div class="run-idle__foot">'
         '<span class="run-idle__meta" data-run-summary></span>'
         '<button type="button" class="btn btn--accent" data-run-start>'
