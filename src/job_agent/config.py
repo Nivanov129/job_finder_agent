@@ -110,6 +110,9 @@ class Config(BaseModel):
     bot_token: str | None = None
     telethon_creds: TelethonCreds | None = None
     enable_contacts: bool = False
+    # Доп-движок контактов (инвестигатор): расследование контактов с confidence/
+    # доказательствами. Дороже (отдельный web-вызов на вакансию), потому opt-in.
+    enable_contact_investigator: bool = False
     # Скорость: параллельные AI-вызовы (нормализация/скоринг) и грубый фильтр по
     # названию должности (из резюме) ДО нормализации — чтобы не гонять AI зря.
     parallelism: int = 4

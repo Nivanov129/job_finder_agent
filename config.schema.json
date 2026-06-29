@@ -164,6 +164,11 @@
       "default": false,
       "description": "Контакт-ассист: найти контакт + черновик обращения. Отправки нет."
     },
+    "enable_contact_investigator": {
+      "type": "boolean",
+      "default": false,
+      "description": "Доп-движок контактов (инвестигатор): расследование с confidence и градацией доказательств. Дороже — отдельный web-вызов на вакансию."
+    },
     "parallelism": {
       "type": "integer",
       "minimum": 1,

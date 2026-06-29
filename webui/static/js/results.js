@@ -38,8 +38,31 @@
       '<div class="res-card__map"><i class="ti ti-map-2"></i>карта ' + r.map + "%</div></div></div>" +
       '<div class="verdict" style="color:' + v.c + '"><i class="ti ' + v.ic + '"></i>' + v.lbl + summary + "</div>" +
       '<div class="res-card__gap">' + esc(r.gap) + "</div>" +
+      investigatorBlock(r.investigation) +
       '<div class="res-card__btns">' + open + letter +
       '<button class="res-btn"><i class="ti ti-user-search"></i>Контакт</button></div></div>'
+    );
+  }
+
+  // Доп. выдача от инвестигатора контактов (с именем) — ранжированные контакты.
+  function investigatorBlock(list) {
+    if (!list || !list.length) return "";
+    var rows = list.map(function (c) {
+      var conf = c.confidence ? '<span class="inv-row__conf mono">' + c.confidence + "%</span>" : "";
+      var route = c.route ? '<span class="inv-row__route">' + esc(c.route) + "</span>" : "";
+      var name = c.link
+        ? '<a href="' + esc(c.link) + '" target="_blank" rel="noopener">' + esc(c.name) + "</a>"
+        : esc(c.name);
+      return '<div class="inv-row">' + conf +
+        '<div class="inv-row__main"><div class="inv-row__name">' + name +
+        (c.role ? ' · <span class="inv-row__role">' + esc(c.role) + "</span>" : "") + "</div>" +
+        route + "</div></div>";
+    }).join("");
+    return (
+      '<details class="inv"><summary class="inv__head">' +
+      '<i class="ti ti-user-search"></i>Контакты · инвестигатор' +
+      '<span class="inv__count">' + list.length + "</span></summary>" +
+      '<div class="inv__list">' + rows + "</div></details>"
     );
   }
 

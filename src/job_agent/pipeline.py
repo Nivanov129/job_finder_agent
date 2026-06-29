@@ -36,6 +36,7 @@ from .engines import make_engine
 from .engines.base import Engine
 from .enrich.contacts import find_contacts
 from .enrich.cover import write_cover_letter
+from .enrich.investigator import investigate_contacts
 from .models import EnrichedResult, RawPost
 from .normalize import normalize_posts
 from .output.xlsx import write_xlsx
@@ -411,6 +412,7 @@ def run_pipeline(
                 threshold=config.cover_letter_threshold,
                 output_lang=config.output_lang,
             )
+            track_name = track.name if track is not None else score.track
             contacts = None
             if config.enable_contacts and contact_searcher is not None:
                 # Изоляция обогащения: сбой контактов (недоступный web-поиск и т.п.)
@@ -420,7 +422,7 @@ def run_pipeline(
                         rv.vacancy,
                         engine,
                         contact_searcher,
-                        track_name=track.name if track is not None else score.track,
+                        track_name=track_name,
                         enable_contacts=True,
                         output_lang=config.output_lang,
                     )
@@ -430,9 +432,26 @@ def run_pipeline(
                         rv.vacancy.title,
                         str(exc)[:160],
                     )
+            investigation = None
+            if config.enable_contact_investigator:
+                # Доп-движок контактов «с именем» — тоже изолирован.
+                try:
+                    investigation = investigate_contacts(
+                        rv.vacancy,
+                        engine,
+                        track_name=track_name,
+                        enable_investigator=True,
+                        output_lang=config.output_lang,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "инвестигатор контактов для «%s» пропущен: %s",
+                        rv.vacancy.title,
+                        str(exc)[:160],
+                    )
             return EnrichedResult(
                 vacancy=rv.vacancy, score=score, cover_letter=cover_letter,
-                contacts=contacts,
+                contacts=contacts, investigation=investigation,
             )
 
         def _run_score(rv) -> EnrichedResult | None:

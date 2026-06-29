@@ -84,6 +84,20 @@ def result_to_dict(er: Any) -> dict[str, Any]:
         if items:
             gap = items[0]
             break
+    investigation = None
+    inv = getattr(er, "investigation", None)
+    if inv is not None and inv.contacts:
+        investigation = [
+            {
+                "name": c.name,
+                "role": c.role,
+                "route": c.contact_route,
+                "confidence": int(c.confidence),
+                "grade": c.evidence_grade,
+                "link": c.link,
+            }
+            for c in inv.contacts[:5]
+        ]
     return {
         "role": er.vacancy.title,
         "company": er.vacancy.company or "",
@@ -96,6 +110,7 @@ def result_to_dict(er: Any) -> dict[str, Any]:
         "gap": gap,
         "has_cover": bool(er.cover_letter),
         "link": er.vacancy.link_or_contact or er.vacancy.url or "",
+        "investigation": investigation,
     }
 
 

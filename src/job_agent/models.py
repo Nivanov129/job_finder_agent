@@ -179,11 +179,40 @@ class ContactResult(BaseModel):
     draft_message: str = ""
 
 
+class InvestigatedContact(BaseModel):
+    """Контакт из инвестигатора (доп. движок поиска контактов «с именем»).
+
+    Богаче `ContactCandidate`: явный маршрут связи, числовой confidence,
+    градация доказательств и обоснование (методика recruiting-contact-investigator).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    role: str = ""
+    contact_route: str = ""  # TG @handle / email / LinkedIn DM / …
+    link: str = ""
+    confidence: int = 0  # 0..100
+    evidence_grade: str = ""  # verified | indexed | cross-source | unverified
+    rationale: str = ""
+
+
+class ContactInvestigation(BaseModel):
+    """Отчёт доп-движка контактов: ранжированные контакты + аудит + next actions."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    contacts: list[InvestigatedContact] = Field(default_factory=list)
+    evidence_checked: list[str] = Field(default_factory=list)
+    next_actions: list[str] = Field(default_factory=list)
+
+
 class EnrichedResult(BaseModel):
     """Финальный результат по вакансии (стадия 6→7): скоринг + обогащение.
 
     `cover_letter` есть только при `overall >= cover_letter_threshold` и шаблоне трека;
-    `contacts` — только при `enable_contacts`. Идёт и в xlsx, и в карточку бота.
+    `contacts` — только при `enable_contacts`. `investigation` — доп. движок
+    контактов (опц., `enable_contact_investigator`). Идёт и в xlsx, и в карточку бота.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -192,3 +221,4 @@ class EnrichedResult(BaseModel):
     score: ScoreResult
     cover_letter: str | None = None
     contacts: ContactResult | None = None
+    investigation: ContactInvestigation | None = None

@@ -806,6 +806,19 @@ textarea.input {
 .verdict .ti { font-size: 16px; }
 .res-card__gap { font-size: 11.5px; color: var(--text-muted); line-height: 1.5; min-height: 34px; }
 .res-card__btns { display: flex; gap: 7px; margin-top: 13px; flex-wrap: wrap; }
+/* доп. выдача инвестигатора контактов */
+.inv { margin-top: 10px; border: 0.5px solid var(--border); border-radius: 10px; background: var(--surface-sub); }
+.inv__head { display: flex; align-items: center; gap: 7px; padding: 8px 11px; font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; list-style: none; }
+.inv__head::-webkit-details-marker { display: none; }
+.inv__head .ti { font-size: 14px; color: var(--text-accent); }
+.inv__count { margin-left: auto; font-size: 10px; font-weight: 600; color: #fff; background: var(--text-accent); border-radius: 10px; padding: 1px 7px; }
+.inv__list { display: flex; flex-direction: column; gap: 6px; padding: 4px 11px 10px; }
+.inv-row { display: flex; align-items: flex-start; gap: 9px; }
+.inv-row__conf { font-size: 11px; font-weight: 600; color: var(--text-success); width: 34px; flex: none; text-align: right; }
+.inv-row__main { flex: 1; min-width: 0; }
+.inv-row__name { font-size: 12px; font-weight: 600; }
+.inv-row__role { font-weight: 500; color: var(--text-muted); }
+.inv-row__route { font-size: 11px; color: var(--text-accent); font-family: var(--font-mono); }
 .res-btn {
   display: inline-flex; align-items: center; gap: 5px; text-decoration: none;
   font: inherit; font-size: 11.5px; font-weight: 500; color: var(--text-primary);
