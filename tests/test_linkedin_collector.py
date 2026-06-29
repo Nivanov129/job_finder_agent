@@ -74,6 +74,40 @@ def test_one_role_failure_does_not_break_others():
     assert len(posts) == 1  # «Bad» упал и пропущен, «Good» собрал
 
 
+def test_drops_aggregate_listings_and_stale():
+    table = {
+        "Product Manager": [
+            # конкретная вакансия — оставить
+            SearchResult(
+                title="Product Manager, Avito · 3 июн. 2026 г.",
+                url="https://ru.linkedin.com/posts/abc-activity-123",
+                snippet="#vacancy #hiring",
+            ),
+            # агрегатный листинг по url — выкинуть
+            SearchResult(
+                title="Product Manager jobs",
+                url="https://www.linkedin.com/jobs/product-manager-jobs",
+            ),
+            # агрегатный листинг по заголовку — выкинуть
+            SearchResult(
+                title="140,000+ Product Manager jobs in United States",
+                url="https://www.linkedin.com/jobs/view/aggregate",
+            ),
+            # старая дата (раньше периода) — выкинуть
+            SearchResult(
+                title="Product Manager · 6 окт. 2024 г.",
+                url="https://ru.linkedin.com/posts/old-activity-9",
+                snippet="hiring",
+            ),
+        ]
+    }
+    col = LinkedinSearchCollector(["Product Manager"], FakeSearcher(table))
+    posts = col.fetch(datetime(2026, 6, 1, tzinfo=UTC))
+    urls = [p.url for p in posts]
+    assert urls == ["https://ru.linkedin.com/posts/abc-activity-123"]
+    assert posts[0].date == datetime(2026, 6, 3, tzinfo=UTC)
+
+
 def test_caps_number_of_roles():
     searcher = FakeSearcher({})
     roles = [f"Role {i}" for i in range(20)]
