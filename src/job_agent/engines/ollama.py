@@ -28,6 +28,7 @@ __all__ = [
     "OllamaEngine",
     "build_request",
     "parse_response",
+    "explain_http_error",
     "DEFAULT_BASE_URL",
     "CLOUD_BASE_URL",
     "OLLAMA_API_KEY_ENV",
@@ -65,13 +66,33 @@ def parse_response(data: dict[str, Any]) -> str:
     return (data.get("message", {}).get("content") or "").strip()
 
 
+def explain_http_error(status: int, model: str) -> str:
+    """Понятное сообщение под коды Ollama Cloud (вместо сырого httpx-исключения)."""
+    if status == 401:
+        return ("Ollama Cloud: ключ неверный или просрочен — возьми новый на "
+                "ollama.com/settings/keys и вставь заново.")
+    if status == 403:
+        return (f"Ollama Cloud: ключ принят, но нет доступа к модели «{model}». "
+                "Обычно нужна подписка Ollama Cloud или модель не доступна твоему "
+                "аккаунту — выбери другую облачную модель (или используй Codex).")
+    if status == 404:
+        return (f"Ollama Cloud: модель «{model}» не найдена — выбери модель из "
+                "списка «Загрузить модели».")
+    if status == 429:
+        return "Ollama Cloud: превышен лимит запросов — подожди и попробуй снова."
+    return f"Ollama Cloud вернул HTTP {status}."
+
+
 def _httpx_transport(  # pragma: no cover - реальная сеть
     url: str, headers: dict[str, str], body: dict[str, Any]
 ) -> dict[str, Any]:
     import httpx
 
     response = httpx.post(url, headers=headers, json=body, timeout=300.0)
-    response.raise_for_status()
+    if response.status_code >= 400:
+        raise RuntimeError(
+            explain_http_error(response.status_code, body.get("model", ""))
+        )
     return response.json()
 
 

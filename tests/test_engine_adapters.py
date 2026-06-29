@@ -28,6 +28,9 @@ from job_agent.engines.ollama import (
     build_request as ollama_build_request,
 )
 from job_agent.engines.ollama import (
+    explain_http_error as ollama_explain,
+)
+from job_agent.engines.ollama import (
     parse_response as ollama_parse_response,
 )
 
@@ -181,6 +184,15 @@ def test_api_from_config_requires_key() -> None:
 
 
 # --- Ollama ------------------------------------------------------------------
+
+
+def test_ollama_explain_http_error_codes() -> None:
+    assert "ключ неверный" in ollama_explain(401, "m")
+    # 403 = ключ принят, но нет доступа к модели (подписка/недоступна)
+    msg = ollama_explain(403, "gpt-oss:120b")
+    assert "нет доступа" in msg and "gpt-oss:120b" in msg
+    assert "не найдена" in ollama_explain(404, "m")
+    assert "лимит" in ollama_explain(429, "m")
 
 
 def test_ollama_request_shape_no_stream() -> None:
