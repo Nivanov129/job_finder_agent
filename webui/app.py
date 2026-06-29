@@ -301,6 +301,36 @@ def create_app(
         (dest_dir / name).write_bytes(content)
         return JSONResponse({"path": f"uploads/{subdir}/{name}", "name": name})
 
+    @app.post("/roles/derive")
+    async def roles_derive(request: Request) -> JSONResponse:
+        # «Допустимые роли» (role_gate) генерим из резюме тем же движком, что и
+        # подбор: AI достаёт базовые названия должностей. Эти роли — гейт включения
+        # вакансий в подборку (по названию должности), уже в языке резюме.
+        from job_agent.pipeline import _read_document
+        from job_agent.titlefilter import derive_titles
+
+        form = await request.form()
+        path = str(form.get("path", "")).strip()
+        if not path:
+            return JSONResponse({"error": "не указан путь к резюме"}, status_code=400)
+        base = target.parent
+        try:
+            text = await run_in_threadpool(_read_document, path, base)
+        except Exception as exc:  # файл не найден / нечитаем
+            return JSONResponse(
+                {"error": f"резюме не прочитать: {str(exc)[:160]}"}, status_code=400
+            )
+        if not text.strip():
+            return JSONResponse({"error": "резюме пустое"}, status_code=400)
+        try:
+            engine = make_engine(load_config(target))
+            roles = await run_in_threadpool(derive_titles, engine, text)
+        except Exception as exc:  # движок не авторизован / упал
+            return JSONResponse(
+                {"error": f"движок недоступен: {str(exc)[:160]}"}, status_code=502
+            )
+        return JSONResponse({"roles": roles})
+
     @app.post("/save", response_class=HTMLResponse)
     async def save(request: Request) -> HTMLResponse:
         form = await request.form()

@@ -117,10 +117,12 @@ def track_card(
             value=template,
         )
         +
-        '<label class="field"><span class="field__label">Допустимые роли (опц., '
-        'через запятую)</span>'
+        '<label class="field"><span class="field__label">Допустимые роли (из резюме)'
+        '<button type="button" class="field__gen" data-derive-roles>'
+        f'{icon("ti-sparkles")} сгенерировать из резюме</button></span>'
         f'<input class="input" name="track_roles" '
-        f'placeholder="Product Manager, Head of Product" value="{escape(roles)}">'
+        f'placeholder="загрузи резюме — роли подставятся сами" value="{escape(roles)}">'
+        '<span class="field__hint" data-roles-status></span>'
         "</label>"
         "</div>"
     )
@@ -513,11 +515,11 @@ def render_results_screen() -> str:
         '<a class="btn btn--accent" href="/run/output.xlsx" download>'
         f'{icon("ti-download")} Скачать .xlsx</a></div>'
         '<div class="res-slider" data-res-slider hidden>'
-        f'<span class="res-slider__head">{icon("ti-adjustments-horizontal")}'
-        "Минимальное совпадение</span>"
+        f'<span class="res-slider__head">{icon("ti-map-2")}'
+        "Совпадение по карте ≥</span>"
         '<input type="range" min="0" max="100" step="1" value="0" '
         'class="res-slider__range" data-res-min '
-        'aria-label="минимальное совпадение резюме, %">'
+        'aria-label="минимальное совпадение по карте, %">'
         '<span class="res-slider__val mono" data-res-minval>0%</span>'
         '<span class="res-slider__count" data-res-count></span>'
         "</div>"

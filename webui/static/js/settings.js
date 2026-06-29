@@ -54,6 +54,45 @@
     if (fileInput) fileInput.click();
   });
 
+  // ── Генерация «Допустимых ролей» из резюме (gate включения в подборку) ──
+  function deriveRoles(card, path, statusEl) {
+    var rolesInput = card && card.querySelector('input[name="track_roles"]');
+    if (!rolesInput || !path) return;
+    if (statusEl) { statusEl.textContent = "ИИ читает резюме и подбирает роли…"; statusEl.className = "field__hint"; }
+    var fd = new FormData();
+    fd.append("path", path);
+    fetch("/roles/derive", { method: "POST", body: fd })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (res) {
+        if (!res.ok) throw new Error(res.body.error || "не удалось");
+        var roles = res.body.roles || [];
+        if (roles.length) {
+          rolesInput.value = roles.join(", ");
+          if (statusEl) { statusEl.textContent = "✓ роли из резюме: " + roles.length; statusEl.className = "field__hint is-ok"; }
+        } else if (statusEl) {
+          statusEl.textContent = "резюме прочитано, но ролей не нашлось — впиши вручную";
+          statusEl.className = "field__hint";
+        }
+      })
+      .catch(function (err) {
+        if (statusEl) { statusEl.textContent = "✗ " + err.message; statusEl.className = "field__hint is-error"; }
+      });
+  }
+
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-derive-roles]");
+    if (!btn) return;
+    var card = btn.closest(".track-card");
+    var pathField = card && card.querySelector('input[name="track_resume"]');
+    var path = pathField && pathField.value.trim();
+    var statusEl = card && card.querySelector("[data-roles-status]");
+    if (!path) {
+      if (statusEl) { statusEl.textContent = "сначала загрузи или укажи резюме"; statusEl.className = "field__hint is-error"; }
+      return;
+    }
+    deriveRoles(card, path, statusEl);
+  });
+
   document.addEventListener("change", function (e) {
     var fileInput = e.target;
     if (!fileInput.classList || !fileInput.classList.contains("file-upload__input")) return;
@@ -79,6 +118,12 @@
         if (!res.ok) throw new Error(res.body.error || "ошибка загрузки");
         if (pathField) pathField.value = res.body.path;
         setStatus(status, "✓ " + res.body.name, "is-ok");
+        // Загрузили резюме → сразу подбираем «Допустимые роли» из него.
+        if (kind === "resume") {
+          var card = row.closest(".track-card");
+          var rolesStatus = card && card.querySelector("[data-roles-status]");
+          deriveRoles(card, res.body.path, rolesStatus);
+        }
       })
       .catch(function (err) {
         setStatus(status, "✗ " + err.message, "is-error");

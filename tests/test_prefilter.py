@@ -85,6 +85,26 @@ def test_role_gate_drops_non_matching_title():
     assert [r.vacancy.title for r in routed] == ["Senior Product Manager"]
 
 
+def test_role_gate_matches_across_word_order_and_endings():
+    # «Менеджер по продукту» должен пройти роль «Менеджер продукта»
+    # (другой порядок слов + окончание) — гейт пословный, стем-устойчивый.
+    table = {"RES_A": [1.0, 0.0, 0.0], "VAC_A": [1.0, 0.0, 0.0]}
+    tracks = [_track("a", role_gate=["Менеджер продукта", "Директор продукта"])]
+    resumes = {"a": "RES_A"}
+
+    kept_a = _vac("Менеджер по продукту", "VAC_A")   # порядок слов + окончание
+    kept_b = _vac("Директор по продукту", "VAC_A")
+    dropped = _vac("Бизнес-аналитик", "VAC_A")       # нет роли с такими словами
+
+    routed = prefilter_and_route(
+        [kept_a, kept_b, dropped], tracks, embedder=_emb(table), track_resumes=resumes
+    )
+    titles = [r.vacancy.title for r in routed]
+    assert "Менеджер по продукту" in titles
+    assert "Директор по продукту" in titles
+    assert "Бизнес-аналитик" not in titles
+
+
 def test_global_role_gate_used_when_track_has_none():
     table = {"RES_A": [1.0, 0.0, 0.0], "VAC_A": [1.0, 0.0, 0.0]}
     tracks = [_track("a")]  # без role_gate → берётся глобальный

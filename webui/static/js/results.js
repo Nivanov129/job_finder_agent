@@ -67,9 +67,11 @@
     if (filtersEl) filtersEl.innerHTML =
       chip("Все", "all") + tracks.map(function (t) { return chip(t, t); }).join("");
 
+    // Включение в подборку — по названию/направлению (это решает пайплайн);
+    // здесь, внутри подборки, фильтруем по карте (map %) ползунком.
     var byTrack = results.filter(function (r) { return filter === "all" || r.track === filter; });
-    var shown = byTrack.filter(function (r) { return r.resume >= minPct; });
-    shown.sort(function (a, b) { return b.resume - a.resume; });
+    var shown = byTrack.filter(function (r) { return r.map >= minPct; });
+    shown.sort(function (a, b) { return b.map - a.map; });
     grid.innerHTML = shown.map(card).join("");
 
     if (minValEl) minValEl.textContent = minPct + "%";

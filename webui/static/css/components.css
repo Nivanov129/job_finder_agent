@@ -333,7 +333,18 @@
 .field__label {
   color: var(--text-secondary);
   font-size: 12px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }
+.field__gen {
+  font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px;
+  color: var(--text-accent); background: var(--bg-accent);
+  border: 0.5px solid rgba(24,95,165,.2); border-radius: 7px; padding: 2px 8px;
+}
+.field__gen .ti { font-size: 13px; }
+.field__hint { font-size: 11px; color: var(--text-muted); min-height: 14px; }
+.field__hint.is-ok { color: var(--text-success); }
+.field__hint.is-error { color: var(--text-warning); }
 
 .input {
   font: inherit;

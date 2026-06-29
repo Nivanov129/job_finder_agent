@@ -20,11 +20,14 @@ N=1 — тривиальный роутинг: единственный трек
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 
 from .config import Track
 from .embeddings import Embedder
 from .models import RoutedVacancy, Vacancy
+
+_WORD_RE = re.compile(r"[a-zа-яё0-9]+")
 
 __all__ = [
     "DEFAULT_MIN_SIM",
@@ -54,12 +57,41 @@ def _vacancy_text(vacancy: Vacancy) -> str:
     return "\n".join(parts)
 
 
+def _stem_match(a: str, b: str) -> bool:
+    """Два слова «совпадают», если одно — префикс другого или общий префикс ≥5.
+
+    Устойчиво к окончаниям и языку: «продукта»↔«продукту», «manager»↔«managers».
+    """
+    if a == b or a.startswith(b) or b.startswith(a):
+        return True
+    common = 0
+    for ca, cb in zip(a, b, strict=False):
+        if ca != cb:
+            break
+        common += 1
+    return common >= 5
+
+
 def _passes_role_gate(title: str, gate: Sequence[str]) -> bool:
-    """Пустой гейт пропускает всех; иначе нужен хотя бы один токен в заголовке."""
+    """Пустой гейт пропускает всех. Иначе вакансия проходит, если её заголовок
+    несёт какую-то роль из гейта — как точное вхождение фразы, так и по
+    словам (устойчиво к порядку слов и предлогам: «Менеджер по продукту»
+    проходит роль «Менеджер продукта»). Значимыми считаем слова длиной ≥4."""
     if not gate:
         return True
     haystack = title.lower()
-    return any(token.lower() in haystack for token in gate)
+    title_words = _WORD_RE.findall(haystack)
+    for role in gate:
+        role_low = role.lower()
+        if role_low in haystack:  # фраза роли целиком в заголовке
+            return True
+        role_words = [w for w in _WORD_RE.findall(role_low) if len(w) >= 4]
+        # все значимые слова роли должны найтись в заголовке (по стему)
+        if role_words and all(
+            any(_stem_match(rw, tw) for tw in title_words) for rw in role_words
+        ):
+            return True
+    return False
 
 
 def _sim_to_percent(sim: float) -> int:
