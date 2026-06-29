@@ -354,6 +354,16 @@
 .tg-creds .field { margin-top: 9px; }
 .tg-creds .card__meta { margin-top: 8px; }
 
+/* Способы входа в Telegram: вкладки + панели + QR */
+.tg-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 4px; }
+.tg-tab { flex: 1 1 auto; justify-content: center; }
+.tg-tab:not(.is-active) { background: var(--surface-1); color: var(--text-secondary); }
+.tg-panel { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.tg-panel[hidden] { display: none; }
+.tg-qr-box { display: flex; justify-content: center; padding: 14px; background: var(--surface-1); border: 0.5px solid var(--border); border-radius: var(--radius-panel); }
+.tg-qr-box[hidden] { display: none; }
+.tg-qr-box img { width: 220px; height: 220px; image-rendering: pixelated; background: #fff; padding: 10px; border-radius: var(--radius); }
+
 .input {
   font: inherit;
   width: 100%;

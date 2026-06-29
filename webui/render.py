@@ -476,20 +476,65 @@ def render_telegram(
             "</section>"
         )
     else:
-        login = (
-            '<section class="card"><div class="card__title">'
-            f'{icon("ti-brand-telegram")} Вход в Telegram</div>'
-            '<div class="card__meta">Только чтение твоих каналов. Сначала укажи свои '
-            "api_id/api_hash (один раз), затем номер — Telegram пришлёт код "
-            "<b>сообщением в само приложение Telegram</b> (от аккаунта «Telegram»), "
-            "<b>не по SMS</b>.</div>"
-            + creds
-            + '<label class="field"><span class="field__label">Телефон '
+        # Три способа входа. QR — основной (не зависит от доставки кода: код по
+        # SMS/в приложение часто не приходит на «общих» api_id). Телефон+код и
+        # готовая строка сессии — альтернативы.
+        tabs = (
+            '<div class="tg-tabs" role="tablist">'
+            '<button type="button" class="btn btn--accent tg-tab is-active" '
+            'data-tg-method="qr">'
+            f'{icon("ti-qrcode")} По QR-коду</button>'
+            '<button type="button" class="btn tg-tab" data-tg-method="phone">'
+            f'{icon("ti-phone")} По телефону</button>'
+            '<button type="button" class="btn tg-tab" data-tg-method="session">'
+            f'{icon("ti-key")} Строкой сессии</button>'
+            "</div>"
+        )
+        panel_qr = (
+            '<div class="tg-panel" data-tg-panel="qr">'
+            '<div class="card__meta">Самый надёжный способ — код никуда слать не '
+            "надо. В <b>приложении Telegram</b> на телефоне: Настройки → "
+            "<b>Устройства</b> → «Подключить устройство» → наведи камеру на QR.</div>"
+            '<button type="button" class="btn btn--accent tg-qr">'
+            f'{icon("ti-qrcode")} Показать QR-код</button>'
+            '<div class="tg-qr-box" data-tg-qr hidden></div>'
+            "</div>"
+        )
+        panel_phone = (
+            '<div class="tg-panel" data-tg-panel="phone" hidden>'
+            '<div class="card__meta">Telegram пришлёт код <b>сообщением в само '
+            "приложение Telegram</b> (от аккаунта «Telegram»), <b>не по SMS</b>. "
+            "Если код не приходит — войди по QR-коду.</div>"
+            '<label class="field"><span class="field__label">Телефон '
             "(с кодом страны)</span>"
             '<input class="input" name="tg_phone" placeholder="+79991234567"></label>'
             '<button type="button" class="btn btn--accent tg-start">'
             f'{icon("ti-send")} Получить код</button>'
-            '<div class="login-flow__out" data-tg-login></div>'
+            "</div>"
+        )
+        panel_session = (
+            '<div class="tg-panel" data-tg-panel="session" hidden>'
+            '<div class="card__meta">Если у тебя уже есть строка сессии Telethon '
+            "(StringSession) — вставь её. Должна быть создана на <b>той же</b> паре "
+            "api_id/api_hash, что указана выше.</div>"
+            '<label class="field"><span class="field__label">Строка сессии</span>'
+            '<input class="input" name="tg_session" type="password" '
+            'placeholder="1Bv…длинная строка"></label>'
+            '<button type="button" class="btn btn--accent tg-session-btn">'
+            f'{icon("ti-login")} Войти по сессии</button>'
+            "</div>"
+        )
+        login = (
+            '<section class="card"><div class="card__title">'
+            f'{icon("ti-brand-telegram")} Вход в Telegram</div>'
+            '<div class="card__meta">Только чтение твоих каналов. Сначала укажи свои '
+            "api_id/api_hash (один раз), затем выбери способ входа.</div>"
+            + creds
+            + tabs
+            + panel_qr
+            + panel_phone
+            + panel_session
+            + '<div class="login-flow__out" data-tg-login></div>'
             "</section>"
         )
     saved = saved or []

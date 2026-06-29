@@ -33,6 +33,44 @@
     if (m) m.className = "login-flow__msg " + (cls || ""), (m.textContent = text);
   }
 
+  // ── Способы входа: переключение вкладок (QR / телефон / строка сессии) ──
+  function selectMethod(method) {
+    Array.prototype.forEach.call(document.querySelectorAll(".tg-tab"), function (b) {
+      b.classList.toggle("is-active", b.getAttribute("data-tg-method") === method);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".tg-panel"), function (p) {
+      p.hidden = p.getAttribute("data-tg-panel") !== method;
+    });
+    loginMsg(""); // чистим прошлые сообщения при смене способа
+  }
+
+  // ── Вход по QR: показать QR и опрашивать сервер, пока не подтвердят ──
+  var qrPolling = false;
+  function pollQr() {
+    if (!qrPolling) return;
+    post("/telegram/login/qr/poll", {}).then(function (r) {
+      if (!qrPolling) return;
+      if (!r.ok) { qrPolling = false; return loginMsg("✗ " + (r.body.message || "ошибка QR"), "is-error"); }
+      var st = r.body.stage;
+      if (st === "qr") {
+        var box = document.querySelector("[data-tg-qr]");
+        if (box && r.body.qr) box.innerHTML = '<img alt="QR" src="' + r.body.qr + '">';
+        setTimeout(pollQr, 2000);
+      } else if (st === "password") {
+        qrPolling = false;
+        passwordForm();
+        subMsg("Аккаунт защищён паролем (2FA) — введи его.", "is-ok");
+      } else if (st === "done") {
+        qrPolling = false;
+        var box2 = document.querySelector("[data-tg-qr]");
+        if (box2) box2.hidden = true;
+        loginMsg("✓ вход выполнен — выгрузите каналы ниже", "is-ok");
+      } else {
+        setTimeout(pollQr, 2000);
+      }
+    }).catch(function () { if (qrPolling) setTimeout(pollQr, 3000); });
+  }
+
   function renderChannels(channels) {
     var list = document.querySelector("[data-tg-channels-list]");
     if (!list) return;
@@ -54,6 +92,38 @@
     if (ev.target.closest(".copy-cmd")) {
       var b = ev.target.closest(".copy-cmd");
       if (navigator.clipboard) navigator.clipboard.writeText(b.getAttribute("data-copy") || "");
+      return;
+    }
+    if (ev.target.closest(".tg-tab")) {
+      qrPolling = false; // уходим с QR — гасим опрос
+      selectMethod(ev.target.closest(".tg-tab").getAttribute("data-tg-method"));
+      return;
+    }
+    if (ev.target.closest(".tg-qr")) {
+      var box = document.querySelector("[data-tg-qr]");
+      if (box) box.hidden = false, (box.innerHTML = '<div class="login-flow__msg">Готовлю QR…</div>');
+      post("/telegram/login/qr", {
+        api_id: field("api_id"),
+        api_hash: field("api_hash"),
+      }).then(function (r) {
+        if (!r.ok) return loginMsg("✗ " + (r.body.message || "ошибка"), "is-error");
+        if (box && r.body.qr) box.innerHTML = '<img alt="QR" src="' + r.body.qr + '">';
+        loginMsg(r.body.message || "Отсканируй QR в приложении Telegram.", "is-ok");
+        qrPolling = true;
+        setTimeout(pollQr, 2000);
+      }).catch(function () { loginMsg("✗ сеть", "is-error"); });
+      return;
+    }
+    if (ev.target.closest(".tg-session-btn")) {
+      loginMsg("Проверяю сессию…");
+      post("/telegram/login/session", {
+        api_id: field("api_id"),
+        api_hash: field("api_hash"),
+        session: field("tg_session"),
+      }).then(function (r) {
+        if (!r.ok) return loginMsg("✗ " + (r.body.message || "ошибка"), "is-error");
+        loginMsg("✓ вход выполнен — выгрузите каналы ниже", "is-ok");
+      }).catch(function () { loginMsg("✗ сеть", "is-error"); });
       return;
     }
     if (ev.target.closest(".tg-start")) {

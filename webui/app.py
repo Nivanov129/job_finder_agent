@@ -504,24 +504,60 @@ def create_app(
             active="/telegram",
         )
 
+    def _resolve_tg_creds(form: Any) -> tuple[str, str]:
+        """api_id/api_hash из формы (если введены) либо из .env; введённые
+        запоминаем в .env, чтобы не вводить заново. Возвращает ('','') если нет."""
+        env = {**os.environ, **parse_env(envfile)}
+        api_id = str(form.get("api_id", "")).strip() or env.get("TELEGRAM_API_ID", "")
+        api_hash = (
+            str(form.get("api_hash", "")).strip() or env.get("TELEGRAM_API_HASH", "")
+        )
+        if str(form.get("api_id", "")).strip() or str(form.get("api_hash", "")).strip():
+            merge_env(envfile, {"TELEGRAM_API_ID": api_id, "TELEGRAM_API_HASH": api_hash})
+        return api_id, api_hash
+
     @app.post("/telegram/login/start")
     async def telegram_start(request: Request) -> JSONResponse:
         form = await request.form()
-        env = {**os.environ, **parse_env(envfile)}
-        # api_id/api_hash — свои у каждого (my.telegram.org). Берём из формы (если
-        # ввёл) либо из .env; введённые запоминаем в .env, чтобы не вводить снова.
-        api_id = str(form.get("api_id", "")).strip() or env.get("TELEGRAM_API_ID", "")
-        api_hash = str(form.get("api_hash", "")).strip() or env.get("TELEGRAM_API_HASH", "")
+        api_id, api_hash = _resolve_tg_creds(form)
         if not (api_id and api_hash):
             return JSONResponse(
                 {"ok": False, "message": "сначала укажи api_id и api_hash "
                  "(my.telegram.org → API development tools)"},
                 status_code=400,
             )
-        if str(form.get("api_id", "")).strip() or str(form.get("api_hash", "")).strip():
-            merge_env(envfile, {"TELEGRAM_API_ID": api_id, "TELEGRAM_API_HASH": api_hash})
         res = await run_in_threadpool(
             _tg_login().start, api_id, api_hash, str(form.get("phone", "")),
+        )
+        return JSONResponse(res, status_code=200 if res.get("ok") else 400)
+
+    @app.post("/telegram/login/qr")
+    async def telegram_qr_start(request: Request) -> JSONResponse:
+        form = await request.form()
+        api_id, api_hash = _resolve_tg_creds(form)
+        if not (api_id and api_hash):
+            return JSONResponse(
+                {"ok": False, "message": "сначала укажи api_id и api_hash "
+                 "(my.telegram.org → API development tools)"},
+                status_code=400,
+            )
+        res = await run_in_threadpool(_tg_login().qr_start, api_id, api_hash)
+        return JSONResponse(res, status_code=200 if res.get("ok") else 400)
+
+    @app.post("/telegram/login/qr/poll")
+    async def telegram_qr_poll() -> JSONResponse:
+        res = await run_in_threadpool(_tg_login().qr_poll)
+        return JSONResponse(res, status_code=200 if res.get("ok") else 400)
+
+    @app.post("/telegram/login/session")
+    async def telegram_session(request: Request) -> JSONResponse:
+        form = await request.form()
+        api_id, api_hash = _resolve_tg_creds(form)
+        res = await run_in_threadpool(
+            _tg_login().import_session,
+            api_id,
+            api_hash,
+            str(form.get("session", "")),
         )
         return JSONResponse(res, status_code=200 if res.get("ok") else 400)
 

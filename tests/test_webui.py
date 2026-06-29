@@ -522,6 +522,18 @@ class _FakeTg:
     def start(self, api_id, api_hash, phone):
         return {"ok": True, "stage": "code", "message": "код отправлен"}
 
+    def qr_start(self, api_id, api_hash):
+        return {"ok": True, "stage": "qr", "qr": "data:image/png;base64,Zm9v",
+                "message": "сканируй QR"}
+
+    def qr_poll(self):
+        return {"ok": True, "stage": "done", "message": "вход выполнен"}
+
+    def import_session(self, api_id, api_hash, session):
+        if not session:
+            return {"ok": False, "message": "вставь строку сессии"}
+        return {"ok": True, "stage": "done", "message": "вход выполнен"}
+
     def submit_code(self, code):
         return {"ok": True, "stage": "done", "message": "вход выполнен"}
 
@@ -553,6 +565,45 @@ def test_telegram_login_start_and_code(tmp_path: Path) -> None:
     assert r.status_code == 200 and r.json()["stage"] == "code"
     r2 = client.post("/telegram/login/code", data={"code": "11111"})
     assert r2.status_code == 200 and r2.json()["stage"] == "done"
+
+
+def test_telegram_page_offers_qr_and_session(tmp_path: Path) -> None:
+    client = TestClient(create_app(config_path=tmp_path / "config.json"))
+    body = client.get("/telegram").text
+    # доступны альтернативы коду: QR и строка сессии
+    assert 'data-tg-method="qr"' in body and 'data-tg-method="session"' in body
+    assert 'name="tg_session"' in body
+
+
+def test_telegram_qr_login(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(config_path=tmp_path / "config.json", telegram_login=_FakeTg())
+    )
+    r = client.post("/telegram/login/qr", data={"api_id": "1", "api_hash": "h"})
+    assert r.status_code == 200 and r.json()["stage"] == "qr"
+    assert r.json()["qr"].startswith("data:image/png")
+    r2 = client.post("/telegram/login/qr/poll")
+    assert r2.status_code == 200 and r2.json()["stage"] == "done"
+
+
+def test_telegram_session_import(tmp_path: Path) -> None:
+    client = TestClient(
+        create_app(config_path=tmp_path / "config.json", telegram_login=_FakeTg())
+    )
+    bad = client.post("/telegram/login/session", data={"api_id": "1", "api_hash": "h"})
+    assert bad.status_code == 400
+    ok = client.post(
+        "/telegram/login/session",
+        data={"api_id": "1", "api_hash": "h", "session": "1Bvabc"},
+    )
+    assert ok.status_code == 200 and ok.json()["stage"] == "done"
+
+
+def test_qr_data_uri_renders_png() -> None:
+    from webui.telegram_login import qr_data_uri
+
+    uri = qr_data_uri("tg://login?token=abc")
+    assert uri.startswith("data:image/png;base64,") and len(uri) > 100
 
 
 def test_telegram_channels_lists(tmp_path: Path) -> None:
