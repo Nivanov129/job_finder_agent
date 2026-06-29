@@ -109,15 +109,27 @@ def test_runner_single_run_at_a_time(tmp_path: Path) -> None:
     assert runner.state()["status"] == "done"
 
 
-def test_runner_seeds_results_from_results_json(tmp_path: Path) -> None:
-    """Подборка прошлого прогона подхватывается из results.json при старте."""
-    (tmp_path / "results.json").write_text(
-        '[{"role": "PM", "company": "Acme"}]', encoding="utf-8"
-    )
+def test_runner_results_from_matchstore(tmp_path: Path) -> None:
+    """Подборка читается из накопительной БД (matches.db), переживая рестарт."""
+    from job_agent.matchstore import MatchStore
+
+    with MatchStore(tmp_path / "matches.db") as store:
+        store.upsert({"role": "PM", "company": "Acme", "resume": 80, "map": 40})
     runner = BackfillRunner(results_dir=tmp_path)
-    assert runner.results() == [{"role": "PM", "company": "Acme"}]
+    rows = runner.results()
+    assert [r["role"] for r in rows] == ["PM"]
 
 
-def test_runner_empty_results_without_dir_or_file(tmp_path: Path) -> None:
+def test_runner_archive_via_store(tmp_path: Path) -> None:
+    from job_agent.matchstore import MatchStore
+
+    with MatchStore(tmp_path / "matches.db") as store:
+        key = store.upsert({"role": "PM", "company": "Acme"})
+    runner = BackfillRunner(results_dir=tmp_path)
+    assert runner.archive(key) is True
+    assert runner.results() == []  # ушла из активных
+
+
+def test_runner_empty_results_without_dir_or_db(tmp_path: Path) -> None:
     assert BackfillRunner().results() == []
-    assert BackfillRunner(results_dir=tmp_path).results() == []  # файла нет
+    assert BackfillRunner(results_dir=tmp_path).results() == []  # БД нет

@@ -736,8 +736,18 @@ def create_app(
 
     @app.get("/run/results")
     def run_results() -> JSONResponse:
-        # Результаты текущего/последнего прогона (наполняются по мере скоринга).
+        # Накопленная подборка из локальной БД (растёт между прогонами).
         return JSONResponse({"results": runner.results()})
+
+    @app.post("/run/match/archive")
+    async def run_match_archive(request: Request) -> JSONResponse:
+        # Убрать вакансию из подборки (в архив) — по ключу из карточки.
+        form = await request.form()
+        key = str(form.get("key", "")).strip()
+        if not key:
+            return JSONResponse({"ok": False, "error": "нет key"}, status_code=400)
+        ok = await run_in_threadpool(runner.archive, key)
+        return JSONResponse({"ok": ok}, status_code=200 if ok else 404)
 
     @app.post("/run/start")
     async def run_start(request: Request) -> JSONResponse:

@@ -41,7 +41,10 @@ def _fake_er(title: str = "PM", overall: int = 80) -> Any:
             track="T",
             scores=SimpleNamespace(overall=overall, map_fit=40),
             verdict=SimpleNamespace(type="match", summary="ок"),
+            gaps=SimpleNamespace(critical=[], strategic=[], cosmetic=[]),
         ),
+        cover_letter=None,
+        investigation=None,
     )
 
 
@@ -63,32 +66,34 @@ def test_load_env_sets_keys_without_clobbering(
 
 
 def test_match_dict_shape() -> None:
-    d = mcp_server.match_dict(_fake_er("Lead", 92))
+    from job_agent.output.summary import match_dict
+
+    d = match_dict(_fake_er("Lead", 92))
     assert d["role"] == "Lead" and d["company"] == "Acme"
     assert d["resume"] == 92 and d["map"] == 40
     assert d["verdict"] == "match" and d["link"] == "u"
     assert d["band"]  # из presentation
 
 
-def test_load_matches_reads_json(tmp_path: Path) -> None:
-    (tmp_path / "results.json").write_text('[{"role": "PM"}]', encoding="utf-8")
-    assert mcp_server.load_matches(tmp_path) == [{"role": "PM"}]
+def test_load_matches_reads_db(tmp_path: Path) -> None:
+    from job_agent.matchstore import MatchStore
+
+    with MatchStore(tmp_path / "matches.db") as store:
+        store.upsert({"role": "PM", "company": "Acme"})
+    assert [r["role"] for r in mcp_server.load_matches(tmp_path)] == ["PM"]
 
 
-def test_load_matches_empty_when_missing_or_bad(tmp_path: Path) -> None:
+def test_load_matches_empty_when_no_db(tmp_path: Path) -> None:
     assert mcp_server.load_matches(tmp_path) == []
-    (tmp_path / "results.json").write_text("{not json", encoding="utf-8")
-    assert mcp_server.load_matches(tmp_path) == []
 
 
-def test_run_search_runs_pipeline_and_writes_results(
+def test_run_search_runs_pipeline_and_persists(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     _write_config(tmp_path)
     captured: dict[str, Any] = {}
 
     def fake_run_pipeline(config, **kw):  # noqa: ANN001
-        captured["since"] = kw["since"]
         captured["window_days"] = (
             __import__("datetime").datetime.now(__import__("datetime").UTC) - kw["since"]
         ).days
@@ -99,10 +104,10 @@ def test_run_search_runs_pipeline_and_writes_results(
     monkeypatch.setattr("job_agent.pipeline.run_pipeline", fake_run_pipeline)
     out = mcp_server.run_search(tmp_path, days=3)
     assert out["count"] == 2
-    assert [m["role"] for m in out["matches"]] == ["PM", "DS"]
+    assert {m["role"] for m in out["matches"]} == {"PM", "DS"}
     assert captured["window_days"] in (2, 3)  # days=3 переопределил конфиг
-    # results.json записан — list_matches его увидит
-    assert mcp_server.load_matches(tmp_path) == out["matches"]
+    # подборка осела в matches.db — list_matches её видит
+    assert {m["role"] for m in mcp_server.load_matches(tmp_path)} == {"PM", "DS"}
 
 
 def test_contacts_for_direct_role_company(

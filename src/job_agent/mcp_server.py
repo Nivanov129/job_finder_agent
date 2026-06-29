@@ -1,10 +1,10 @@
 """MCP-сервер (stdio): инструменты job-agent для локального агента (Claude
 Desktop/Code). Читает тот же каталог данных, что и web-UI (`data/`): `config.json`,
-`.env` (ключи движка), `results.json` (подборка последнего прогона).
+`.env` (ключи движка), `matches.db` (накопительная подборка).
 
 Инструменты:
-- ``list_matches`` — вакансии из последнего прогона (читает `results.json`,
-  который пишут и web-UI, и ``run_backfill``);
+- ``list_matches`` — активная подборка из локальной БД `matches.db` (её копят и
+  web-UI, и ``run_backfill``; накапливается между прогонами);
 - ``run_backfill`` — запустить подбор за период и вернуть финалистов;
 - ``find_contacts`` — контакты к вакансии по ссылке / тексту / паре роль+компания.
 
@@ -19,7 +19,6 @@ MCP-рантайма и тестируются без сети (движок и 
 
 from __future__ import annotations
 
-import json
 import os
 import re
 from pathlib import Path
@@ -30,7 +29,7 @@ if TYPE_CHECKING:
     from .models import EnrichedResult
     from .websearch.base import Searcher
 
-__all__ = ["main", "load_matches", "run_search", "contacts_for", "match_dict", "data_dir"]
+__all__ = ["main", "load_matches", "run_search", "contacts_for", "data_dir"]
 
 
 def data_dir() -> Path:
@@ -56,35 +55,16 @@ def _load_env(base: Path) -> None:
             os.environ.setdefault(key, val.strip().strip("'\""))
 
 
-def match_dict(er: EnrichedResult) -> dict[str, Any]:
-    """Компактный вид вакансии для агента (роль, компания, проценты, вердикт)."""
-    from .presentation import badge_band
-
-    s = er.score.scores
-    return {
-        "role": er.vacancy.title,
-        "company": er.vacancy.company or "",
-        "track": er.score.track,
-        "resume": int(s.overall),
-        "map": int(s.map_fit),
-        "band": badge_band(s.overall),
-        "verdict": er.score.verdict.type,
-        "verdict_summary": er.score.verdict.summary or "",
-        "link": er.vacancy.link_or_contact or er.vacancy.url or "",
-    }
-
-
 def load_matches(base: Path | None = None) -> list[dict[str, Any]]:
-    """Вакансии из последнего прогона (`results.json`) или `[]`, если прогонов нет."""
+    """Активная подборка из локальной БД (`matches.db`) или `[]`, если её нет."""
+    from .matchstore import MatchStore
+
     base = Path(base) if base is not None else data_dir()
-    path = base / "results.json"
-    if not path.exists():
+    db = base / "matches.db"
+    if not db.exists():
         return []
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return []
-    return data if isinstance(data, list) else []
+    with MatchStore(db) as store:
+        return store.list()
 
 
 def run_search(
@@ -94,7 +74,7 @@ def run_search(
     engine: Engine | None = None,
     searcher: Searcher | None = None,
 ) -> dict[str, Any]:
-    """Запустить подбор за период (one-shot), записать `results.json`, вернуть итог.
+    """Запустить подбор за период (one-shot), накопить в `matches.db`, вернуть итог.
 
     `days` — глубина в днях (None/0 → `config.backfill_days`). `engine`/`searcher`
     инъектируются в тестах; в бою строятся из конфига.
@@ -103,6 +83,8 @@ def run_search(
 
     from .config import load_config
     from .dedup import SeenStore
+    from .matchstore import MatchStore
+    from .output.summary import match_dict
     from .pipeline import run_pipeline
 
     base = Path(base) if base is not None else data_dir()
@@ -111,22 +93,26 @@ def run_search(
     window = days if days and days > 0 else config.backfill_days
     since = datetime.now(UTC) - timedelta(days=window)
     matches: list[dict[str, Any]] = []
-    run_pipeline(
-        config,
-        since=since,
-        base_dir=base,
-        output_path=base / "backfill.xlsx",
-        seen_store=SeenStore(":memory:"),
-        engine=engine,
-        searcher=searcher,
-        on_result=lambda er: matches.append(match_dict(er)),
-    )
+    store = MatchStore(base / "matches.db")
+
+    def _collect(er: EnrichedResult) -> None:
+        item = match_dict(er)
+        matches.append(item)
+        store.upsert(item)
+
     try:
-        tmp = base / "results.json.tmp"
-        tmp.write_text(json.dumps(matches, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(base / "results.json")
-    except OSError:
-        pass
+        run_pipeline(
+            config,
+            since=since,
+            base_dir=base,
+            output_path=base / "backfill.xlsx",
+            seen_store=SeenStore(":memory:"),
+            engine=engine,
+            searcher=searcher,
+            on_result=_collect,
+        )
+    finally:
+        store.close()
     return {"count": len(matches), "matches": matches}
 
 

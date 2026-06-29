@@ -29,7 +29,7 @@
       ? '<a class="res-btn" href="' + esc(r.link) + '" target="_blank" rel="noopener"><i class="ti ti-external-link"></i>Открыть</a>'
       : '<button class="res-btn"><i class="ti ti-external-link"></i>Открыть</button>';
     return (
-      '<div class="res-card">' +
+      '<div class="res-card" data-match-key="' + esc(r.key || "") + '">' +
       '<div class="res-card__head"><div class="res-card__main">' +
       '<div class="res-card__role">' + esc(r.role) + "</div>" +
       '<div class="res-card__co">' + esc(r.company) + "</div>" +
@@ -42,7 +42,9 @@
       '<div class="res-card__btns">' + open + letter +
       '<button class="res-btn" data-find-contact data-role="' + esc(r.role) +
       '" data-company="' + esc(r.company) + '" data-link="' + esc(r.link || "") +
-      '"><i class="ti ti-user-search"></i>Контакт</button></div>' +
+      '"><i class="ti ti-user-search"></i>Контакт</button>' +
+      (r.key ? '<button class="res-btn" data-archive title="убрать из подборки"><i class="ti ti-archive"></i>В архив</button>' : "") +
+      '</div>' +
       '<div class="res-card__contacts" data-card-contacts hidden></div></div>'
     );
   }
@@ -146,6 +148,27 @@
       })
       .catch(function (err) { if (box) box.innerHTML = '<div class="contact-block__sub">✗ ' + esc(err.message) + "</div>"; })
       .finally(function () { btn.disabled = false; });
+  });
+
+  // «В архив»: скрыть вакансию из подборки (статус archived в БД).
+  document.addEventListener("click", function (ev) {
+    var btn = ev.target.closest("[data-archive]");
+    if (!btn) return;
+    var cardEl = btn.closest(".res-card");
+    var key = cardEl ? cardEl.getAttribute("data-match-key") : "";
+    if (!key) return;
+    btn.disabled = true;
+    var fd = new FormData();
+    fd.append("key", key);
+    fetch("/run/match/archive", { method: "POST", body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) { btn.disabled = false; return; }
+        lastData = lastData.filter(function (x) { return x.key !== key; });
+        last = JSON.stringify(lastData);  // чтобы poll не вернул карточку обратно
+        paint();
+      })
+      .catch(function () { btn.disabled = false; });
   });
 
   if (minEl) minEl.addEventListener("input", function () {

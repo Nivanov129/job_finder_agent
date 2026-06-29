@@ -72,47 +72,9 @@ BackfillFn = Callable[[Path, ProgressFn, ResultFn, ItemFn, bool], dict[str, Any]
 _FEED_MAX = 24  # сколько последних «прочитанных/оцениваемых» постов держим в ленте
 
 
-def result_to_dict(er: Any) -> dict[str, Any]:
-    """Компактный вид обогащённого результата для UI (карточка/лента)."""
-    from job_agent.presentation import badge_band
-
-    s = er.score.scores
-    v = er.score.verdict
-    band = badge_band(s.overall)
-    gaps = er.score.gaps
-    gap = ""
-    for items in (gaps.critical, gaps.strategic, gaps.cosmetic):
-        if items:
-            gap = items[0]
-            break
-    investigation = None
-    inv = getattr(er, "investigation", None)
-    if inv is not None and inv.contacts:
-        investigation = [
-            {
-                "name": c.name,
-                "role": c.role,
-                "route": c.contact_route,
-                "confidence": int(c.confidence),
-                "grade": c.evidence_grade,
-                "link": c.link,
-            }
-            for c in inv.contacts[:5]
-        ]
-    return {
-        "role": er.vacancy.title,
-        "company": er.vacancy.company or "",
-        "track": er.score.track,
-        "resume": int(s.overall),
-        "map": int(s.map_fit),
-        "band": band,
-        "verdict": v.type,
-        "verdict_summary": v.summary or "",
-        "gap": gap,
-        "has_cover": bool(er.cover_letter),
-        "link": er.vacancy.link_or_contact or er.vacancy.url or "",
-        "investigation": investigation,
-    }
+# Компактный вид обогащённого результата — общий шейпер в ядре (та же форма для
+# UI, БД подборки и MCP). Оставляем имя result_to_dict для совместимости.
+from job_agent.output.summary import match_dict as result_to_dict  # noqa: E402
 
 
 class BackfillRunner:
@@ -122,12 +84,15 @@ class BackfillRunner:
         self, *, run: BackfillFn | None = None, results_dir: Path | str | None = None
     ) -> None:
         self._run = run or _default_run
-        # Каталог данных: при старте подхватываем подборку прошлого прогона из
-        # results.json — иначе на свежем процессе (рестарт стека) UI был пустой,
-        # пока не запустишь новый прогон. Прогон перезапишет файл.
-        self._results_dir = Path(results_dir) if results_dir is not None else None
+        # Каталог данных → локальная БД подборки (matches.db). Подборку читаем из
+        # неё (накопление между прогонами), а не из памяти — иначе на свежем
+        # процессе (рестарт стека) UI был бы пуст. None (тесты с инъекцией run) →
+        # отдаём in-memory результаты прогона.
+        self._matches_db = (
+            Path(results_dir) / "matches.db" if results_dir is not None else None
+        )
         self._state = RunState()
-        self._results: list[dict[str, Any]] = self._load_persisted()
+        self._results: list[dict[str, Any]] = []
         self._feed: list[dict[str, Any]] = []  # живая лента: что AI читает/оценивает
         self._lock = threading.Lock()
         # агент
@@ -161,16 +126,23 @@ class BackfillRunner:
         return True
 
     def results(self) -> list[dict[str, Any]]:
+        """Подборка: из БД (накопленная, активная) либо in-memory (тесты)."""
+        if self._matches_db is not None:
+            from job_agent.matchstore import MatchStore
+
+            with MatchStore(self._matches_db) as store:
+                return store.list()
         with self._lock:
             return list(self._results)
 
-    def _load_persisted(self) -> list[dict[str, Any]]:
-        """Подборка прошлого прогона из results.json (или [], если нет/каталог не задан)."""
-        if self._results_dir is None:
-            return []
-        from job_agent.mcp_server import load_matches
+    def archive(self, key: str) -> bool:
+        """Убрать вакансию из подборки (статус archived). True — если нашлась."""
+        if self._matches_db is None:
+            return False
+        from job_agent.matchstore import MatchStore
 
-        return load_matches(self._results_dir)
+        with MatchStore(self._matches_db) as store:
+            return store.set_status(key, "archived")
 
     def _on_result(self, item: dict[str, Any]) -> None:
         with self._lock:
@@ -286,36 +258,37 @@ def _default_run(  # pragma: no cover - пайплайн
 
     out = base / "backfill.xlsx"
     # В агент-режиме копим финалистов (EnrichedResult), чтобы после прогона
-    # отправить НОВЫЕ вакансии в Telegram-бот владельца. Для разового «Подбора»
-    # бот не шлём (результаты и так в UI) — копить незачем.
+    # отправить НОВЫЕ вакансии в Telegram-бот владельца.
     finalists: list[Any] = []
-    # Подборку персистим в results.json — её читает MCP-сервер (отдельный процесс)
-    # как list_matches; обновляется и ручным «Подбором», и агент-прогоном.
-    match_dicts: list[dict[str, Any]] = []
+    # Подборку накапливаем в локальной БД (matches.db): апсёрт по мере оценки —
+    # подборка растёт и сразу видна в UI/MCP, а не перетирается прогоном.
+    from job_agent.matchstore import MatchStore
+
+    store = MatchStore(base / "matches.db")
 
     def _on_result_er(er: Any) -> None:
         if agent_mode:
             finalists.append(er)
         d = result_to_dict(er)
-        match_dicts.append(d)
+        try:
+            store.upsert(d)
+        except Exception as exc:  # БД не должна валить прогон
+            logging.getLogger("job_agent.webui.runner").warning(
+                "matches.db upsert пропущен: %s", str(exc)[:120]
+            )
         on_result(d)
 
-    result = run_pipeline(
-        config, since=since, base_dir=base, output_path=out,
-        seen_store=seen_store,
-        on_progress=on_progress,
-        on_result=_on_result_er,
-        on_item=on_item,
-    )
-    write_last_run(last_run_file, now)
     try:
-        tmp = base / "results.json.tmp"
-        tmp.write_text(json.dumps(match_dicts, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(base / "results.json")
-    except OSError as exc:
-        logging.getLogger("job_agent.webui.runner").warning(
-            "results.json не записан: %s", str(exc)[:120]
+        result = run_pipeline(
+            config, since=since, base_dir=base, output_path=out,
+            seen_store=seen_store,
+            on_progress=on_progress,
+            on_result=_on_result_er,
+            on_item=on_item,
         )
+    finally:
+        store.close()
+    write_last_run(last_run_file, now)
     if agent_mode and finalists:
         try:
             from .notify import notify_new_vacancies
