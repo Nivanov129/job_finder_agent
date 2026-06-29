@@ -136,7 +136,7 @@ def test_engine_statuses_threads_ollama_key() -> None:
         http_get=http_get,
     )
     # OpenRouter без ключа не ходит в сеть — заголовки в seen остаются от Ollama.
-    assert [s.key for s in states] == ["codex", "ollama", "openrouter"]
+    assert [s.key for s in states] == ["claude", "codex", "ollama", "openrouter"]
     assert seen["headers"]["authorization"] == "Bearer sk"
 
 

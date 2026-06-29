@@ -386,13 +386,15 @@ def render_engine(
     """
     active = (
         cli_tool if scoring_engine == "cli" else scoring_engine
-    )  # codex|ollama|openrouter
-    if active not in ("codex", "ollama", "openrouter"):
+    )  # claude|codex|ollama|openrouter
+    if active not in ("claude", "codex", "ollama", "openrouter"):
         active = "codex"
 
     choices = (
-        _engine_choice("codex", "Codex", "вход через ChatGPT", "подписка",
-                       active=active == "codex")
+        _engine_choice("claude", "Claude Code", "вход через Anthropic", "подписка",
+                       active=active == "claude")
+        + _engine_choice("codex", "Codex", "вход через ChatGPT", "подписка",
+                         active=active == "codex")
         + _engine_choice("ollama", "Ollama Cloud", "модель по умолчанию", "нужен ключ",
                          active=active == "ollama")
         + _engine_choice("openrouter", "OpenRouter", "бесплатная модель", "бесплатно",
@@ -407,6 +409,17 @@ def render_engine(
             "</label>"
         )
 
+    claude_panel = _auth_panel(
+        "claude",
+        "Claude Code — вход по setup-token (без API-ключа)",
+        "Вход в один клик: сервер запустит <code>claude setup-token</code> и "
+        "покажет ссылку — откройте её, авторизуйтесь в Anthropic (нужна подписка "
+        "Claude), получите <b>код</b>, вставьте его в поле ниже и нажмите «Готово». "
+        "Токен сохранится локально (<code>CLAUDE_CODE_OAUTH_TOKEN</code>)."
+        + _login_widget("claude"),
+        "",  # claude авторизуется по setup-token, поля ключа нет
+        visible=active == "claude",
+    )
     codex_panel = _auth_panel(
         "codex",
         "Codex — вход через ChatGPT (без API-ключа)",
@@ -443,7 +456,7 @@ def render_engine(
         '<section class="card">'
         f'<div class="card__title">{icon("ti-cpu")} Движок AI</div>'
         f'<div class="engine-grid">{choices}</div>'
-        f"{codex_panel}{ollama_panel}{openrouter_panel}"
+        f"{claude_panel}{codex_panel}{ollama_panel}{openrouter_panel}"
         "</section>"
         + '<div class="form-footer">'
         '<button type="submit" class="btn btn--accent">Сохранить</button></div>'

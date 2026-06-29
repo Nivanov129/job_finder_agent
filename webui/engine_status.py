@@ -216,6 +216,7 @@ def engine_statuses(
     run = run or _default_run
     http_get = http_get or _default_http_get
     return [
+        claude_status(which=which, run=run, env=env),
         codex_status(which=which, run=run, env=env),
         ollama_status(ollama_url, api_key=env.get("OLLAMA_API_KEY"), http_get=http_get),
         openrouter_status(api_key=env.get("OPENROUTER_API_KEY"), http_get=http_get),

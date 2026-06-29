@@ -276,13 +276,17 @@ def test_upload_then_path_used_in_valid_config(tmp_path: Path) -> None:
 
 def test_engine_page_default_is_codex(client: TestClient) -> None:
     body = client.get("/engine").text
-    # два движка: codex (дефолт, checked) и ollama; claude/api_key убраны
+    # движки: claude + codex (CLI по подписке), ollama, openrouter; api_key убран
     codex = body.split('value="codex"', 1)[1][:40]
-    assert "checked" in codex
-    for value in ('value="codex"', 'value="ollama"', 'value="openrouter"'):
+    assert "checked" in codex  # codex — дефолт (checked)
+    claude = body.split('value="claude"', 1)[1][:40]
+    assert "checked" not in claude  # claude доступен, но не выбран по умолчанию
+    for value in (
+        'value="claude"', 'value="codex"', 'value="ollama"', 'value="openrouter"'
+    ):
         assert value in body
-    assert 'value="claude"' not in body
     assert 'value="api_key"' not in body
+    assert "Claude Code" in body
     assert "подписка" in body and "нужен ключ" in body and "бесплатно" in body
     # статус подтягивается локальным engine.js, без CDN
     assert "/static/js/engine.js" in body
@@ -374,20 +378,20 @@ def test_engine_save_codex_sets_cli_no_secret(tmp_path: Path) -> None:
 
 def test_engine_page_shows_only_selected_panel(client: TestClient) -> None:
     body = client.get("/engine").text
-    # дефолт — codex: его панель видима, ollama скрыта (hidden); claude убран
+    # дефолт — codex: его панель видима, claude/ollama скрыты (hidden)
     assert '<div class="auth-panel" data-engine="codex">' in body
+    assert '<div class="auth-panel" data-engine="claude" hidden>' in body
     assert '<div class="auth-panel" data-engine="ollama" hidden>' in body
-    assert 'data-engine="claude"' not in body
-    # codex без поля ключа; api_key/claude_token полей нет
+    # CLI без поля ключа; api_key/claude_token полей нет
     assert 'name="codex_key"' not in body
     assert 'name="claude_token"' not in body
 
 
-def test_engine_page_has_login_button_codex(client: TestClient) -> None:
+def test_engine_page_has_login_button_for_cli_engines(client: TestClient) -> None:
     body = client.get("/engine").text
-    # server-driven вход остался только у codex
+    # server-driven вход у обоих CLI-движков: claude и codex
     assert 'class="btn btn--accent login-start" data-engine="codex"' in body
-    assert 'data-engine="claude"' not in body
+    assert 'class="btn btn--accent login-start" data-engine="claude"' in body
 
 
 def _login_app(tmp_path: Path):
@@ -762,7 +766,7 @@ def test_engine_status_route_lists_engines(tmp_path: Path) -> None:
     client = TestClient(create_app(config_path=tmp_path / "config.json"))
     data = client.get("/engine/status").json()
     keys = {e["key"] for e in data["engines"]}
-    assert keys == {"codex", "ollama", "openrouter"}
+    assert keys == {"claude", "codex", "ollama", "openrouter"}
     for e in data["engines"]:
         assert set(e) >= {"key", "label", "billing", "installed", "authorized", "detail"}
 
