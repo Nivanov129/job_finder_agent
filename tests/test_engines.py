@@ -66,4 +66,18 @@ def test_make_engine_unknown_raises_config_error() -> None:
 
 
 def test_known_engines_match_schema_enum() -> None:
-    assert KNOWN_ENGINES == ("cli", "api_key", "ollama")
+    assert KNOWN_ENGINES == ("cli", "api_key", "ollama", "openrouter")
+
+
+def test_make_engine_openrouter_reads_env_key(monkeypatch) -> None:
+    from job_agent.engines.api_key import ApiKeyEngine
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    engine = make_engine(_config("openrouter"))
+    assert isinstance(engine, ApiKeyEngine) and engine.provider == "openrouter"
+
+
+def test_make_engine_openrouter_without_key_raises(monkeypatch) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    with pytest.raises(ConfigError, match="OPENROUTER_API_KEY"):
+        make_engine(_config("openrouter"))

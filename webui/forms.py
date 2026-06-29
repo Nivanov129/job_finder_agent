@@ -146,9 +146,11 @@ def engine_config_from_form(
     секреты не возвращаются, чтобы не затирать ранее заданные.
 
     Маппинг радио `engine` → конфиг: claude/codex → `scoring_engine=cli` +
-    `cli_tool`; ollama → `scoring_engine=ollama`. Движок `api_key` со страницы
-    убран (доступен только ручной правкой config.json). Web-поиск не настраивается
-    в UI — работает на дефолтном SearXNG из compose.
+    `cli_tool`; ollama → `scoring_engine=ollama`; openrouter →
+    `scoring_engine=openrouter`. У ollama/openrouter выбор модели убран —
+    движок берёт бесплатную модель по умолчанию, в UI только поле ключа.
+    Движок `api_key` со страницы убран (доступен ручной правкой config.json).
+    Web-поиск не настраивается в UI — работает на дефолтном SearXNG из compose.
     """
     engine = _clean(form.get("engine", "")) or "codex"
     config: dict[str, Any] = {}
@@ -160,13 +162,17 @@ def engine_config_from_form(
         config["scoring_engine"] = "cli"
         config["cli_tool"] = engine
     elif engine == "ollama":
+        # Выбор модели в UI убран — движок берёт бесплатную модель по умолчанию.
         config["scoring_engine"] = "ollama"
-        model = _clean(form.get("ollama_model", ""))
         key = _clean(form.get("ollama_key", ""))
-        if model:
-            config["ollama_model"] = model
         if key:  # ключ Ollama Cloud — секрет, в .env, не в config.json
             secrets["OLLAMA_API_KEY"] = key
+    elif engine == "openrouter":
+        # OpenRouter — только ключ; модель бесплатная по умолчанию.
+        config["scoring_engine"] = "openrouter"
+        key = _clean(form.get("openrouter_key", ""))
+        if key:  # ключ OpenRouter — секрет, в .env, не в config.json
+            secrets["OPENROUTER_API_KEY"] = key
 
     # Web-поиск в UI не настраивается: дефолтный SearXNG из compose (см. websearch).
     return config, secrets

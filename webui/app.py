@@ -310,8 +310,8 @@ def create_app(
             render_engine(
                 scoring_engine=se,
                 cli_tool=cfg.get("cli_tool", "codex"),
-                ollama_model=cfg.get("ollama_model", ""),
                 has_ollama_key=bool(env.get("OLLAMA_API_KEY")),
+                has_openrouter_key=bool(env.get("OPENROUTER_API_KEY")),
             ),
             scripts='<script src="/static/js/engine.js"></script>',
             active="/engine",
@@ -803,6 +803,14 @@ def _probe_engine(engine_key: str, cfg: dict, envfile: Path) -> tuple[bool, str]
 
             out = ApiKeyEngine(
                 cfg.get("api_key") or "", base_url=cfg.get("api_base_url")
+            ).complete(prompt)
+        elif engine_key == "openrouter":
+            from job_agent.engines.api_key import ApiKeyEngine
+
+            env = {**os.environ, **parse_env(envfile)}
+            out = ApiKeyEngine(
+                env.get("OPENROUTER_API_KEY") or "",  # свежий ключ из .env сразу
+                provider="openrouter",
             ).complete(prompt)
         else:
             return False, f"неизвестный движок: {engine_key}"

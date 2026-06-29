@@ -358,26 +358,29 @@ def render_engine(
     *,
     scoring_engine: str = "cli",
     cli_tool: str = "codex",
-    ollama_model: str = "",
     has_ollama_key: bool = False,
+    has_openrouter_key: bool = False,
 ) -> str:
     """Экран «AI · авторизация»: выбор движка, статус, авторизация, web-поиск.
 
-    Два движка: Codex (вход через ChatGPT) и Ollama Cloud (ключ + модель).
-    Видна панель только выбранного движка; статусы заполняет JS из `/engine/status`.
-    Секреты в значения полей не подставляются — только пометка «уже задан».
+    Три движка: Codex (вход через ChatGPT), Ollama Cloud и OpenRouter (только
+    ключ — модель бесплатная по умолчанию, выбор модели убран). Видна панель
+    только выбранного движка; статусы заполняет JS из `/engine/status`. Секреты
+    в значения полей не подставляются — только пометка «уже задан».
     """
     active = (
         cli_tool if scoring_engine == "cli" else scoring_engine
-    )  # codex|ollama
-    if active not in ("codex", "ollama"):
+    )  # codex|ollama|openrouter
+    if active not in ("codex", "ollama", "openrouter"):
         active = "codex"
 
     choices = (
         _engine_choice("codex", "Codex", "вход через ChatGPT", "подписка",
                        active=active == "codex")
-        + _engine_choice("ollama", "Ollama Cloud", "облачные модели", "нужен ключ",
+        + _engine_choice("ollama", "Ollama Cloud", "модель по умолчанию", "нужен ключ",
                          active=active == "ollama")
+        + _engine_choice("openrouter", "OpenRouter", "бесплатная модель", "бесплатно",
+                         active=active == "openrouter")
     )
 
     def secret_field(name: str, label: str, placeholder: str, *, has: bool) -> str:
@@ -398,27 +401,25 @@ def render_engine(
         "",  # codex авторизуется по входу ChatGPT, поля ключа нет
         visible=active == "codex",
     )
-    # Текущая модель — первой опцией списка (JS дозаполнит реальными с сервера).
-    model_opts = (
-        f'<option value="{escape(ollama_model)}" selected>{escape(ollama_model)}</option>'
-        if ollama_model
-        else '<option value="" selected>— загрузите модели —</option>'
-    )
     ollama_panel = _auth_panel(
         "ollama",
         "Ollama Cloud — облачные модели",
-        "Ключ — на " + _copy_cmd("ollama.com/settings/keys") + ". Вставьте его, "
-        "нажмите «Загрузить модели» и выберите модель.",
+        "Ключ — на " + _copy_cmd("ollama.com/settings/keys") + ". Вставьте его и "
+        "нажмите «Проверить» — модель подберётся автоматически "
+        "(по умолчанию <code>gpt-oss:120b</code>).",
         secret_field("ollama_key", "OLLAMA_API_KEY", "вставьте ключ облака",
-                     has=has_ollama_key)
-        + '<button type="button" class="btn ollama-load">'
-        f'{icon("ti-refresh")} Загрузить модели</button>'
-        '<span class="path-input__status" data-ollama-load></span>'
-        '<label class="field"><span class="field__label">Модель</span>'
-        f'<select class="input" name="ollama_model" data-ollama-model-select>{model_opts}'
-        "</select></label>",
+                     has=has_ollama_key),
         visible=active == "ollama",
-        with_test=False,  # у Ollama своя кнопка «Загрузить модели» вместо «Проверить»
+    )
+    openrouter_panel = _auth_panel(
+        "openrouter",
+        "OpenRouter — бесплатная модель по умолчанию",
+        "Бесплатный ключ — на " + _copy_cmd("openrouter.ai/keys") + " (карта не "
+        "нужна). Вставьте его и нажмите «Проверить»: модель выбирается "
+        "автоматически из доступных бесплатных (<code>openrouter/free</code>).",
+        secret_field("openrouter_key", "OPENROUTER_API_KEY", "вставьте ключ OpenRouter",
+                     has=has_openrouter_key),
+        visible=active == "openrouter",
     )
 
     return (
@@ -426,7 +427,7 @@ def render_engine(
         '<section class="card">'
         f'<div class="card__title">{icon("ti-cpu")} Движок AI</div>'
         f'<div class="engine-grid">{choices}</div>'
-        f"{codex_panel}{ollama_panel}"
+        f"{codex_panel}{ollama_panel}{openrouter_panel}"
         "</section>"
         + '<div class="form-footer">'
         '<button type="submit" class="btn btn--accent">Сохранить</button></div>'

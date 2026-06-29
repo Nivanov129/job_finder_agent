@@ -135,8 +135,25 @@ def test_engine_statuses_threads_ollama_key() -> None:
         which=_which({"codex"}), run=_run_ok,
         http_get=http_get,
     )
-    assert [s.key for s in states] == ["codex", "ollama"]
+    # OpenRouter без ключа не ходит в сеть — заголовки в seen остаются от Ollama.
+    assert [s.key for s in states] == ["codex", "ollama", "openrouter"]
     assert seen["headers"]["authorization"] == "Bearer sk"
+
+
+def test_openrouter_status_key_accepted_and_missing() -> None:
+    from webui.engine_status import openrouter_status
+
+    ok = openrouter_status(api_key="sk-or", http_get=lambda url, h: {"data": {}})
+    assert ok.key == "openrouter" and ok.authorized is True
+
+    miss = openrouter_status(api_key=None, http_get=lambda url, h: {})
+    assert miss.authorized is False and "OPENROUTER_API_KEY" in miss.detail
+
+    def boom(url: str, h: dict) -> dict:
+        raise RuntimeError("401")
+
+    bad = openrouter_status(api_key="bad", http_get=boom)
+    assert bad.authorized is False
 
 
 def test_recommend_first_prioritizes_task_models() -> None:

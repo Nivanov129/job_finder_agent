@@ -279,11 +279,11 @@ def test_engine_page_default_is_codex(client: TestClient) -> None:
     # два движка: codex (дефолт, checked) и ollama; claude/api_key убраны
     codex = body.split('value="codex"', 1)[1][:40]
     assert "checked" in codex
-    for value in ('value="codex"', 'value="ollama"'):
+    for value in ('value="codex"', 'value="ollama"', 'value="openrouter"'):
         assert value in body
     assert 'value="claude"' not in body
     assert 'value="api_key"' not in body
-    assert "подписка" in body and "нужен ключ" in body
+    assert "подписка" in body and "нужен ключ" in body and "бесплатно" in body
     # статус подтягивается локальным engine.js, без CDN
     assert "/static/js/engine.js" in body
     assert "cdn.jsdelivr.net" not in body
@@ -443,20 +443,18 @@ def test_login_start_unsupported_engine_400(tmp_path: Path) -> None:
     assert r.status_code == 400 and r.json()["ok"] is False
 
 
-def test_engine_save_ollama_model(tmp_path: Path) -> None:
+def test_engine_save_ollama_no_model_choice(tmp_path: Path) -> None:
     from job_agent.config import load_config
 
     cfg_path = tmp_path / "config.json"
     client = TestClient(create_app(config_path=cfg_path))
     _seed_config(client)
-    r = client.post(
-        "/engine/save",
-        data={"engine": "ollama", "ollama_model": "gpt-oss:120b"},
-    )
+    # Выбор модели в UI убран — форма модель не шлёт; движок берёт дефолт.
+    r = client.post("/engine/save", data={"engine": "ollama"})
     assert r.status_code == 200
     cfg = load_config(cfg_path)
     assert cfg.scoring_engine == "ollama"
-    assert cfg.ollama_model == "gpt-oss:120b"
+    assert cfg.ollama_model is None  # модель не задаётся из UI — дефолт в движке
     assert cfg.api_base_url is None  # только облако — своего URL нет
 
 
@@ -468,11 +466,11 @@ def test_engine_save_ollama_cloud_key_to_env_not_config(tmp_path: Path) -> None:
     _seed_config(client)
     r = client.post(
         "/engine/save",
-        data={"engine": "ollama", "ollama_model": "gpt-oss:120b", "ollama_key": "sk-cloud"},
+        data={"engine": "ollama", "ollama_key": "sk-cloud"},
     )
     assert r.status_code == 200
     cfg = load_config(cfg_path)
-    assert cfg.scoring_engine == "ollama" and cfg.ollama_model == "gpt-oss:120b"
+    assert cfg.scoring_engine == "ollama"
     # пустой url → облако по умолчанию (api_base_url не задаётся)
     assert cfg.api_base_url is None
     # ключ облака — в .env, не в config.json
@@ -481,13 +479,36 @@ def test_engine_save_ollama_cloud_key_to_env_not_config(tmp_path: Path) -> None:
     assert "sk-cloud" not in cfg_path.read_text(encoding="utf-8")
 
 
-def test_engine_page_ollama_simplified(client: TestClient) -> None:
+def test_engine_save_openrouter_key_to_env(tmp_path: Path) -> None:
+    from job_agent.config import load_config
+
+    cfg_path = tmp_path / "config.json"
+    client = TestClient(create_app(config_path=cfg_path))
+    _seed_config(client)
+    r = client.post(
+        "/engine/save",
+        data={"engine": "openrouter", "openrouter_key": "sk-or-123"},
+    )
+    assert r.status_code == 200
+    cfg = load_config(cfg_path)
+    assert cfg.scoring_engine == "openrouter"
+    # ключ OpenRouter — в .env, не в config.json
+    env = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert "OPENROUTER_API_KEY=sk-or-123" in env
+    assert "sk-or-123" not in cfg_path.read_text(encoding="utf-8")
+
+
+def test_engine_page_ollama_and_openrouter_simplified(client: TestClient) -> None:
     body = client.get("/engine").text
-    # ключ + кнопка «Загрузить модели» + select моделей; без URL-поля своего сервера
+    # Ollama: ключ + кнопка «Проверить»; без выбора модели и «Загрузить модели»
     assert 'data-copy="ollama.com/settings/keys"' in body
-    assert 'class="btn ollama-load"' in body
-    assert 'name="ollama_model"' in body and "data-ollama-model-select" in body
+    assert 'class="btn ollama-load"' not in body
+    assert 'name="ollama_model"' not in body and "data-ollama-model-select" not in body
     assert 'name="ollama_url"' not in body
+    # OpenRouter: выбор движка + поле ключа, без выбора модели
+    assert 'value="openrouter"' in body
+    assert 'name="openrouter_key"' in body
+    assert 'data-copy="openrouter.ai/keys"' in body
 
 
 def test_save_backfill_starts_run_and_shows_run_page(tmp_path: Path) -> None:
@@ -730,18 +751,18 @@ def test_settings_save_preserves_engine_choice(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.json"
     client = TestClient(create_app(config_path=cfg_path))
     _seed_config(client)
-    client.post("/engine/save", data={"engine": "ollama", "ollama_model": "qwen2"})
+    client.post("/engine/save", data={"engine": "ollama"})
     # повторное сохранение Настройки не должно сбросить движок обратно на cli
     client.post("/save", data=_single_track_form())
     cfg = load_config(cfg_path)
-    assert cfg.scoring_engine == "ollama" and cfg.ollama_model == "qwen2"
+    assert cfg.scoring_engine == "ollama"
 
 
 def test_engine_status_route_lists_engines(tmp_path: Path) -> None:
     client = TestClient(create_app(config_path=tmp_path / "config.json"))
     data = client.get("/engine/status").json()
     keys = {e["key"] for e in data["engines"]}
-    assert keys == {"codex", "ollama"}
+    assert keys == {"codex", "ollama", "openrouter"}
     for e in data["engines"]:
         assert set(e) >= {"key", "label", "billing", "installed", "authorized", "detail"}
 

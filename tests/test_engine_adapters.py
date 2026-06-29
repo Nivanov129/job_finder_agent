@@ -260,14 +260,48 @@ def test_ollama_engine_uses_transport_and_ignores_web_search() -> None:
     assert engine.complete("x", web_search=True) == "локально"
 
 
-def test_ollama_engine_requires_model() -> None:
-    with pytest.raises(ConfigError):
-        OllamaEngine("")
+def test_ollama_engine_defaults_model_when_empty() -> None:
+    # Выбор модели в UI убран — пустое значение даёт бесплатную модель по умолчанию.
+    from job_agent.engines.ollama import DEFAULT_MODEL
+
+    captured: dict[str, object] = {}
+
+    def transport(url: str, headers: dict[str, str], body: dict) -> dict:
+        captured["model"] = body["model"]
+        return _openai_reply("ok")
+
+    OllamaEngine(transport=transport).complete("x")
+    assert captured["model"] == DEFAULT_MODEL
 
 
-def test_ollama_from_config_requires_model() -> None:
-    with pytest.raises(ConfigError):
-        OllamaEngine.from_config(_config("ollama"))
+def test_ollama_from_config_uses_default_model() -> None:
+    from job_agent.engines.ollama import DEFAULT_MODEL
+
+    engine = OllamaEngine.from_config(_config("ollama"))
+    assert engine._model == DEFAULT_MODEL  # type: ignore[attr-defined]
+
+
+def test_openrouter_build_request_is_openai_compatible() -> None:
+    url, headers, body = api_build_request(
+        "openrouter", "https://openrouter.ai/api", "sk-or", "openrouter/free", "P"
+    )
+    assert url == "https://openrouter.ai/api/v1/chat/completions"
+    assert headers["authorization"] == "Bearer sk-or"
+    assert body["model"] == "openrouter/free"
+    assert api_parse_response("openrouter", _openai_reply("готово")) == "готово"
+
+
+def test_openrouter_engine_defaults_base_and_model() -> None:
+    captured: dict[str, object] = {}
+
+    def transport(url: str, headers: dict[str, str], body: dict) -> dict:
+        captured["url"], captured["model"] = url, body["model"]
+        return _openai_reply("ok")
+
+    engine = ApiKeyEngine("sk-or", provider="openrouter", transport=transport)
+    assert engine.complete("x") == "ok"
+    assert captured["url"] == "https://openrouter.ai/api/v1/chat/completions"
+    assert captured["model"] == "openrouter/free"
 
 
 # --- Фабрика строит реальные адаптеры (без сети) -----------------------------

@@ -25,18 +25,28 @@ __all__ = [
     "parse_response",
     "detect_provider",
     "KNOWN_PROVIDERS",
+    "OPENROUTER_API_KEY_ENV",
 ]
 
-KNOWN_PROVIDERS: tuple[str, ...] = ("anthropic", "openai")
+KNOWN_PROVIDERS: tuple[str, ...] = ("anthropic", "openai", "openrouter")
 
+# Базовые URL БЕЗ хвоста /v1 — он добавляется в build_request (OpenAI-стиль).
 _DEFAULT_BASE_URL = {
     "anthropic": "https://api.anthropic.com",
     "openai": "https://api.openai.com",
+    "openrouter": "https://openrouter.ai/api",
 }
 _DEFAULT_MODEL = {
     "anthropic": "claude-opus-4-8",
     "openai": "gpt-4o",
+    # Мета-роутер OpenRouter: сам выбирает доступную бесплатную модель — выбор
+    # модели в UI убран, всегда «что-то бесплатное и доступное».
+    "openrouter": "openrouter/free",
 }
+# OpenAI-совместимые провайдеры: тело запроса и разбор ответа одинаковы.
+_OPENAI_COMPATIBLE = ("openai", "openrouter")
+#: Переменная окружения с ключом OpenRouter (секрет, живёт в `.env`).
+OPENROUTER_API_KEY_ENV = "OPENROUTER_API_KEY"
 _ANTHROPIC_VERSION = "2023-06-01"
 
 # (url, headers, json_body) -> распарсенный JSON-ответ.
@@ -79,11 +89,14 @@ def build_request(
         if web_search:
             body["tools"] = [{"type": "web_search_20250305", "name": "web_search"}]
         return f"{base}/v1/messages", headers, body
-    if provider == "openai":
+    if provider in _OPENAI_COMPATIBLE:
         headers = {
             "authorization": f"Bearer {api_key}",
             "content-type": "application/json",
         }
+        if provider == "openrouter":
+            # Необязательные заголовки рейтинга OpenRouter (на работу не влияют).
+            headers["x-title"] = "job-agent"
         body = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
@@ -99,7 +112,7 @@ def parse_response(provider: str, data: dict[str, Any]) -> str:
         blocks = data.get("content", []) or []
         parts = [b.get("text", "") for b in blocks if b.get("type") == "text"]
         return "".join(parts).strip()
-    if provider == "openai":
+    if provider in _OPENAI_COMPATIBLE:
         choices = data.get("choices", []) or []
         if not choices:
             return ""
@@ -157,6 +170,22 @@ class ApiKeyEngine(Engine):
             base_url=config.api_base_url,
             transport=transport,
         )
+
+    @classmethod
+    def openrouter_from_env(
+        cls, *, transport: HttpTransport | None = None
+    ) -> ApiKeyEngine:
+        """Движок OpenRouter: ключ из `.env` (OPENROUTER_API_KEY), базовый URL и
+        бесплатная модель — по умолчанию (выбор модели в UI убран)."""
+        import os
+
+        key = os.environ.get(OPENROUTER_API_KEY_ENV, "")
+        if not key:
+            raise ConfigError(
+                "scoring_engine='openrouter' требует ключ OPENROUTER_API_KEY "
+                "(.env) — возьми бесплатный на openrouter.ai/keys"
+            )
+        return cls(key, provider="openrouter", transport=transport)
 
     @property
     def provider(self) -> str:

@@ -22,8 +22,10 @@ __all__ = [
     "codex_status",
     "ollama_status",
     "ollama_models",
+    "openrouter_status",
     "recommend_first",
     "CLOUD_BASE_URL",
+    "OPENROUTER_BASE_URL",
 ]
 
 # Внешние границы (в тестах подменяются фейками).
@@ -37,6 +39,8 @@ CLAUDE_CREDS = Path("/root/.claude/.credentials.json")
 CODEX_AUTH = Path("/root/.codex/auth.json")
 # Облачный хост Ollama Cloud — дефолт, если адрес своего сервера не задан.
 CLOUD_BASE_URL = "https://ollama.com"
+# OpenAI-совместимый эндпоинт OpenRouter.
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 @dataclass
@@ -169,6 +173,33 @@ def ollama_status(
         return EngineStatus("ollama", label, "free", None, False, f"недоступно: {where}")
 
 
+def openrouter_status(
+    *, api_key: str | None, http_get: HttpGetFn
+) -> EngineStatus:
+    """Состояние OpenRouter: проверяем ключ дёшево через `/v1/key` (требует
+    авторизации — даёт честный authorized=True/False), модель — бесплатная по
+    умолчанию, выбор модели в UI нет."""
+    label = "OpenRouter"
+    if not api_key:
+        return EngineStatus(
+            "openrouter", label, "free", None, False,
+            "нужен ключ OPENROUTER_API_KEY (openrouter.ai/keys, бесплатно)",
+        )
+    try:
+        http_get(
+            f"{OPENROUTER_BASE_URL}/key", {"authorization": f"Bearer {api_key}"}
+        )
+        return EngineStatus(
+            "openrouter", label, "free", None, True,
+            "ключ принят · бесплатная модель по умолчанию (openrouter/free)",
+        )
+    except Exception:
+        return EngineStatus(
+            "openrouter", label, "free", None, False,
+            "ключ неверный или сеть недоступна",
+        )
+
+
 def engine_statuses(
     *,
     env: Mapping[str, str],
@@ -179,13 +210,15 @@ def engine_statuses(
 ) -> list[EngineStatus]:
     """Состояния всех движков (порядок = порядок карточек в UI).
 
-    Ключ Ollama Cloud берётся из `env['OLLAMA_API_KEY']` — секрет живёт в `.env`.
+    Ключи берутся из `.env`: Ollama Cloud — `OLLAMA_API_KEY`, OpenRouter —
+    `OPENROUTER_API_KEY` (секреты живут в `.env`).
     """
     run = run or _default_run
     http_get = http_get or _default_http_get
     return [
         codex_status(which=which, run=run, env=env),
         ollama_status(ollama_url, api_key=env.get("OLLAMA_API_KEY"), http_get=http_get),
+        openrouter_status(api_key=env.get("OPENROUTER_API_KEY"), http_get=http_get),
     ]
 
 

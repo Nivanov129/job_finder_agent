@@ -17,7 +17,6 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any
 
-from ..config import ConfigError
 from .api_key import HttpTransport
 from .base import Engine
 
@@ -31,6 +30,7 @@ __all__ = [
     "parse_response",
     "explain_http_error",
     "DEFAULT_BASE_URL",
+    "DEFAULT_MODEL",
     "CLOUD_BASE_URL",
     "OLLAMA_API_KEY_ENV",
 ]
@@ -38,6 +38,9 @@ __all__ = [
 #: Облачный хост Ollama Cloud — дефолт (большие модели, авторизация по ключу).
 CLOUD_BASE_URL = "https://ollama.com"
 DEFAULT_BASE_URL = CLOUD_BASE_URL
+#: Модель по умолчанию (выбор модели в UI убран): флагман Ollama Cloud,
+#: бесплатный, многоязычный, хорош в строгом JSON.
+DEFAULT_MODEL = "gpt-oss:120b"
 #: Имя переменной окружения с ключом облака (живёт в `.env`, не в config.json).
 OLLAMA_API_KEY_ENV = "OLLAMA_API_KEY"
 
@@ -109,15 +112,14 @@ class OllamaEngine(Engine):
 
     def __init__(
         self,
-        model: str,
+        model: str | None = None,
         *,
         base_url: str | None = None,
         api_key: str | None = None,
         transport: HttpTransport | None = None,
     ) -> None:
-        if not model:
-            raise ConfigError("scoring_engine='ollama' требует непустого 'ollama_model'")
-        self._model = model
+        # Выбор модели в UI убран — пустое значение даёт дефолт.
+        self._model = model or DEFAULT_MODEL
         self._base_url = base_url or DEFAULT_BASE_URL
         self._api_key = api_key or None
         self._transport = transport or _httpx_transport
@@ -126,10 +128,9 @@ class OllamaEngine(Engine):
     def from_config(
         cls, config: Config, *, transport: HttpTransport | None = None
     ) -> OllamaEngine:
-        if not config.ollama_model:
-            raise ConfigError("scoring_engine='ollama' требует поля 'ollama_model'")
+        # Модель необязательна — при отсутствии берём DEFAULT_MODEL.
         return cls(
-            config.ollama_model,
+            config.ollama_model or None,
             base_url=config.api_base_url,
             # Ключ облака — секрет, живёт в окружении (`.env`), не в config.json.
             api_key=os.environ.get(OLLAMA_API_KEY_ENV),

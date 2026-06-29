@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 __all__ = ["Engine", "FakeEngine", "KNOWN_ENGINES", "make_engine"]
 
 # Имена движков из `config.schema.json` (enum scoring_engine).
-KNOWN_ENGINES: tuple[str, ...] = ("cli", "api_key", "ollama")
+KNOWN_ENGINES: tuple[str, ...] = ("cli", "api_key", "ollama", "openrouter")
 
 
 def make_engine(config: Config, *, override: Engine | None = None) -> Engine:
@@ -47,6 +47,12 @@ def make_engine(config: Config, *, override: Engine | None = None) -> Engine:
         from .api_key import ApiKeyEngine
 
         return ApiKeyEngine.from_config(config)
+    if engine == "openrouter":
+        from .api_key import ApiKeyEngine
+
+        # OpenRouter — OpenAI-совместимый агрегатор; ключ из .env, модель —
+        # бесплатная по умолчанию (выбор модели в UI убран).
+        return ApiKeyEngine.openrouter_from_env()
     from .ollama import OllamaEngine
 
     return OllamaEngine.from_config(config)

@@ -104,9 +104,9 @@
 
     "scoring_engine": {
       "type": "string",
-      "enum": ["cli", "api_key", "ollama"],
+      "enum": ["cli", "api_key", "ollama", "openrouter"],
       "default": "cli",
-      "description": "Движок скоринга (BYO). cli — Claude Code/Codex на подписке (дефолт). api_key — Anthropic/OpenAI. ollama — Ollama Cloud (облачные модели) или свой сервер."
+      "description": "Движок скоринга (BYO). cli — Claude Code/Codex на подписке (дефолт). api_key — Anthropic/OpenAI. ollama — Ollama Cloud (облачные модели) или свой сервер. openrouter — OpenRouter (бесплатная модель по умолчанию)."
     },
     "cli_tool": {
       "type": "string",
