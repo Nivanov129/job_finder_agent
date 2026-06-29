@@ -318,7 +318,8 @@ def create_app(
         env = {**os.environ, **parse_env(envfile)}
         key = str(form.get("key", "")).strip() or env.get("OLLAMA_API_KEY")
         models = await run_in_threadpool(ollama_models, "", api_key=key)
-        return JSONResponse({"models": recommend_first(models)})
+        # Сокращаем дропдаун: рекомендованные под задачу первыми, не больше 12.
+        return JSONResponse({"models": recommend_first(models)[:12]})
 
     @app.get("/engine/status")
     def engine_status() -> JSONResponse:

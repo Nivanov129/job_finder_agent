@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 __all__ = [
     "OllamaEngine",
     "build_request",
+    "cloud_model_name",
     "parse_response",
     "explain_http_error",
     "DEFAULT_BASE_URL",
@@ -41,6 +42,16 @@ DEFAULT_BASE_URL = CLOUD_BASE_URL
 OLLAMA_API_KEY_ENV = "OLLAMA_API_KEY"
 
 
+def cloud_model_name(model: str) -> str:
+    """Имя облачной модели Ollama адресуется тегом `:cloud` (как в приложении
+    Ollama: `glm-5.2:cloud`). Если тега ещё нет — добавляем; иначе оставляем как
+    есть (у уже тегированных вроде `gpt-oss:120b` свой тег)."""
+    model = model.strip()
+    if not model or ":" in model:
+        return model
+    return f"{model}:cloud"
+
+
 def build_request(
     base_url: str, model: str, prompt: str, *, api_key: str | None = None
 ) -> tuple[str, dict[str, str], dict[str, Any]]:
@@ -48,13 +59,15 @@ def build_request(
 
     При непустом `api_key` добавляется заголовок `Authorization: Bearer <key>`
     (Ollama Cloud); для локального сервера ключ не нужен — заголовок опускается.
+    Для облака (`ollama.com`) имя модели нормализуется к `<name>:cloud`.
     """
     base = base_url.rstrip("/")
+    name = cloud_model_name(model) if "ollama.com" in base else model
     headers = {"content-type": "application/json"}
     if api_key:
         headers["authorization"] = f"Bearer {api_key}"
     body: dict[str, Any] = {
-        "model": model,
+        "model": name,
         "messages": [{"role": "user", "content": prompt}],
         "stream": False,
     }

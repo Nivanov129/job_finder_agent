@@ -212,6 +212,18 @@ def test_ollama_cloud_adds_bearer_auth() -> None:
     assert headers["authorization"] == "Bearer sk-cloud"
 
 
+def test_ollama_cloud_model_gets_cloud_tag() -> None:
+    # На облаке безтеговое имя адресуется как <name>:cloud (как в приложении Ollama).
+    _, _, body = ollama_build_request("https://ollama.com", "glm-5.2", "P")
+    assert body["model"] == "glm-5.2:cloud"
+    # Уже тегированное имя не трогаем.
+    _, _, body2 = ollama_build_request("https://ollama.com", "gpt-oss:120b", "P")
+    assert body2["model"] == "gpt-oss:120b"
+    # Локальный сервер — без :cloud.
+    _, _, body3 = ollama_build_request("http://localhost:11434", "glm-5.2", "P")
+    assert body3["model"] == "glm-5.2"
+
+
 def test_ollama_from_config_reads_cloud_key_from_env(monkeypatch) -> None:
     monkeypatch.setenv("OLLAMA_API_KEY", "sk-from-env")
     captured: dict[str, str] = {}

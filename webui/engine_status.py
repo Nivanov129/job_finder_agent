@@ -105,11 +105,18 @@ def ollama_models(
     """
     http_get = http_get or _default_http_get
     base = (url or CLOUD_BASE_URL).rstrip("/")
+    is_cloud = "ollama.com" in base
     try:
         data = http_get(f"{base}/api/tags", _ollama_headers(api_key))
     except Exception:
         return []
-    return [m.get("name", "") for m in (data.get("models") or []) if m.get("name")]
+    names = [m.get("name", "") for m in (data.get("models") or []) if m.get("name")]
+    if is_cloud:
+        # Облако адресуется тегом :cloud (как в приложении Ollama) — нормализуем.
+        from job_agent.engines.ollama import cloud_model_name
+
+        names = list(dict.fromkeys(cloud_model_name(n) for n in names))
+    return names
 
 
 # Семейства моделей, хорошо подходящих под нашу задачу (скоринг: рассуждение,

@@ -110,7 +110,18 @@ def test_ollama_models_helper_returns_names() -> None:
         assert headers["authorization"] == "Bearer k"
         return {"models": [{"name": "a"}, {"name": "b"}, {"other": "x"}]}
 
-    assert ollama_models("", api_key="k", http_get=http_get) == ["a", "b"]
+    # Облако (url="" → ollama.com): имена нормализуются к тегу :cloud.
+    assert ollama_models("", api_key="k", http_get=http_get) == ["a:cloud", "b:cloud"]
+
+
+def test_ollama_models_local_keeps_bare_names() -> None:
+    def http_get(url: str, headers: dict) -> dict:
+        return {"models": [{"name": "llama3.1"}, {"name": "qwen2.5"}]}
+
+    # Локальный сервер — без :cloud.
+    assert ollama_models("http://localhost:11434", http_get=http_get) == [
+        "llama3.1", "qwen2.5",
+    ]
 
 
 def test_ollama_models_helper_swallows_errors() -> None:
