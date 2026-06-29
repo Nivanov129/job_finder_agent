@@ -107,10 +107,12 @@ services:
       # пересборке образа (как у пайплайна; наполняет model-init).
       FASTEMBED_CACHE_PATH: /models
     depends_on:
+      # НЕ ждём завершения model-init: UI должен подняться сразу, чтобы можно
+      # было настраивать (резюме/AI/Telegram), пока модель качается в фоне.
       searxng:
         condition: service_started
       model-init:
-        condition: service_completed_successfully
+        condition: service_started
     env_file:
       # Те же токены авторизации, что у пайплайна: статус-пробы и «Проверить» на
       # странице «AI · авторизация» должны видеть ту же авторизацию.
@@ -128,8 +130,10 @@ services:
       # Постоянный seen-store (тот же том, что у пайплайна) — «виденное»
       # переживает пересборку образа.
       - seen_store:/var/lib/job-agent
-      # Кэш модели эмбеддингов (read-only — пишет только model-init).
-      - model_cache:/models:ro
+      # Кэш модели эмбеддингов. RW (не :ro): UI стартует, не дожидаясь model-init,
+      # и если прогон случится до конца загрузки — embedder дотянет модель сам
+      # (huggingface_hub координирует параллельную загрузку файловыми локами).
+      - model_cache:/models
     ports:
       # Опубликован на всех интерфейсах хоста — UI доступен из локальной сети
       # (http://<IP-хоста>:8766). ВНИМАНИЕ: у UI нет аутентификации, а форма
