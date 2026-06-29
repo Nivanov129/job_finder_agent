@@ -17,6 +17,7 @@ import json
 import os
 import re
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, File, Form, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
@@ -32,6 +33,7 @@ from webui.forms import config_from_form, engine_config_from_form
 from webui.login_flow import LoginManager, LoginSpawner, default_spawner
 from webui.render import (
     render_agent,
+    render_contacts,
     render_engine,
     render_results_screen,
     render_run,
@@ -96,6 +98,7 @@ _TITLES: dict[str, tuple[str, str]] = {
     "/agent": ("Агент", "always-on · реагирует на новые посты в реальном времени"),
     "/run": ("Подбор за период", "разовый прогон за выбранный отрезок времени"),
     "/results": ("Подборка", "финалисты с двумя процентами, по убыванию резюме %"),
+    "/contacts": ("Поиск контактов", "контакты к конкретной вакансии — даже не из агента"),
     "/": ("Настройка", "направления, источники и выхлоп"),
     "/engine": ("Движок AI", "твой AI считает каждое совпадение локально"),
     "/telegram": ("Telegram", "каналы-источники и бот для выдачи"),
@@ -179,6 +182,67 @@ def create_app(
             scripts='<script src="/static/js/results.js"></script>',
             active="/results",
         )
+
+    @app.get("/contacts", response_class=HTMLResponse)
+    def contacts_page() -> str:
+        return page(
+            render_contacts(),
+            scripts='<script src="/static/js/contacts.js"></script>',
+            active="/contacts",
+        )
+
+    @app.post("/contacts/search")
+    async def contacts_search(request: Request) -> JSONResponse:
+        # Контакты к одной вакансии по запросу: основная выдача (find_contacts) +
+        # опц. инвестигатор. Движок и web-поиск — те же, что у пайплайна.
+        from job_agent.enrich.contacts import find_contacts
+        from job_agent.enrich.investigator import investigate_contacts
+        from job_agent.models import Vacancy
+        from job_agent.websearch import make_searcher
+
+        form = await request.form()
+        role = str(form.get("role", "")).strip()
+        company = str(form.get("company", "")).strip()
+        region = str(form.get("region", "")).strip()
+        link = str(form.get("link", "")).strip()
+        want_inv = str(form.get("investigator", "")).lower() in ("on", "true", "1")
+        if not role or not company:
+            return JSONResponse(
+                {"error": "нужны должность и компания"}, status_code=400
+            )
+        vac = Vacancy(
+            title=role, company=company,
+            link_or_contact=link or None, url=link or None,
+        )
+        cfg = load_config(target)
+        engine = make_engine(cfg)
+
+        def _run() -> dict[str, Any]:
+            out: dict[str, Any] = {"contacts": None, "investigation": None}
+            try:
+                searcher = make_searcher(cfg)
+                res = find_contacts(
+                    vac, engine, searcher, track_name=role,
+                    enable_contacts=True, region=region,
+                    output_lang=cfg.output_lang,
+                )
+                out["contacts"] = res.model_dump() if res is not None else None
+            except Exception as exc:
+                out["contacts_error"] = str(exc)[:200]
+            if want_inv:
+                try:
+                    inv = investigate_contacts(
+                        vac, engine, track_name=role,
+                        enable_investigator=True, region=region,
+                        output_lang=cfg.output_lang,
+                    )
+                    out["investigation"] = inv.model_dump() if inv is not None else None
+                except Exception as exc:
+                    out["investigation_error"] = str(exc)[:200]
+            return out
+
+        result = await run_in_threadpool(_run)
+        return JSONResponse(result)
 
     @app.get("/engine", response_class=HTMLResponse)
     def engine() -> str:

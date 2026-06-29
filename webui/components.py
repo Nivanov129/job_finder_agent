@@ -35,6 +35,7 @@ NAV_ITEMS: tuple[tuple[str, str, str], ...] = (
     ("/agent", "ti-radar-2", "Агент"),
     ("/run", "ti-calendar-search", "Подбор за период"),
     ("/results", "ti-stack-2", "Подборка"),
+    ("/contacts", "ti-address-book", "Поиск контактов"),
     ("/", "ti-adjustments", "Настройка"),
     ("/engine", "ti-cpu", "AI · авторизация"),
     ("/telegram", "ti-brand-telegram", "Telegram"),

@@ -45,6 +45,21 @@ def test_index_renders(client: TestClient) -> None:
     assert "ti-radar-2" in body
 
 
+def test_contacts_page_renders(client: TestClient) -> None:
+    r = client.get("/contacts")
+    assert r.status_code == 200
+    body = r.text
+    assert "data-contact-form" in body  # форма поиска контактов
+    assert "Поиск контактов" in body  # пункт меню/заголовок
+    assert "/static/js/contacts.js" in body
+
+
+def test_contacts_search_requires_role_and_company(client: TestClient) -> None:
+    # без обязательных полей — 400, без обращения к движку/сети
+    r = client.post("/contacts/search", data={"role": "", "company": ""})
+    assert r.status_code == 400
+
+
 def test_index_no_cdn(client: TestClient) -> None:
     body = client.get("/").text
     assert "cdn.jsdelivr.net" not in body

@@ -530,6 +530,44 @@ def render_results_screen() -> str:
     )
 
 
+def render_contacts() -> str:
+    """Экран «Поиск контактов»: форма по конкретной вакансии (роль+компания) →
+    основная выдача (contacts) + инвестигатор. Поток ведёт contacts.js."""
+    note = (
+        '<div class="run-banner">'
+        f'{icon("ti-info-circle")}<div>Нашёл вакансию мимо агента? Впиши должность и '
+        "компанию — найду, кому написать: рекрутёры и нанимающие, с маршрутом связи "
+        "и черновиком. Отправки нет, только данные.</div></div>"
+    )
+    form = (
+        '<section class="card"><form class="contact-form" data-contact-form>'
+        '<div class="contact-form__row">'
+        '<label class="field"><span class="field__label">Должность *</span>'
+        '<input class="input" name="role" required '
+        'placeholder="напр. Senior Product Manager"></label>'
+        '<label class="field"><span class="field__label">Компания *</span>'
+        '<input class="input" name="company" required placeholder="напр. Avito"></label>'
+        "</div>"
+        '<div class="contact-form__row">'
+        '<label class="field"><span class="field__label">Регион (опц.)</span>'
+        '<input class="input" name="region" placeholder="напр. Москва / Remote"></label>'
+        '<label class="field"><span class="field__label">Ссылка на вакансию (опц.)</span>'
+        '<input class="input" name="link" placeholder="https://…"></label>'
+        "</div>"
+        '<label class="field contact-form__check"><input type="checkbox" '
+        'name="investigator"> Глубокое расследование (инвестигатор · web-обход, '
+        "минуты)</label>"
+        '<button type="submit" class="btn btn--accent" data-contact-go>'
+        f'{icon("ti-user-search")} Найти контакты</button>'
+        "</form></section>"
+    )
+    result = (
+        '<div class="contact-status" data-contact-status hidden></div>'
+        '<div data-contact-result></div>'
+    )
+    return note + form + result
+
+
 def render_agent() -> str:
     """Экран «Агент» (дашборд авто-поиска) — каркас, данные наполняет agent.js."""
     hero = (
