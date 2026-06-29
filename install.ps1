@@ -25,18 +25,42 @@ function Write-Info  { param($m) Write-Host "==> $m" -ForegroundColor Cyan }
 function Write-Warn  { param($m) Write-Host "!! $m"  -ForegroundColor Yellow }
 function Write-Err   { param($m) Write-Host "xx $m"  -ForegroundColor Red }
 
-# --- 1. Docker -------------------------------------------------------------
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-  Write-Err "Docker не найден. Установите Docker Desktop и запустите снова:"
-  Write-Err "  $DockerDesktopUrl"
-  exit 1
+# --- 1. Docker (ставим сами, если нет) -------------------------------------
+function Wait-Docker {
+  Write-Info "Жду готовности Docker (до ~3 минут; Docker Desktop может попросить принять условия)…"
+  for ($i = 0; $i -lt 90; $i++) {
+    docker info *> $null
+    if ($LASTEXITCODE -eq 0) { return $true }
+    Start-Sleep -Seconds 2
+  }
+  return $false
 }
 
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+  Write-Warn "Docker не найден — ставлю автоматически (это нормально для первого запуска)."
+  if (Get-Command winget -ErrorAction SilentlyContinue) {
+    Write-Info "Ставлю Docker Desktop через winget…"
+    winget install -e --id Docker.DockerDesktop --accept-source-agreements --accept-package-agreements
+  } else {
+    Write-Err "Не нашёл winget для авто-установки. Поставь Docker Desktop вручную и запусти снова:"
+    Write-Err "  $DockerDesktopUrl"
+    exit 1
+  }
+  # обновить PATH в текущей сессии, чтобы увидеть свежий docker
+  $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
+}
+
+# Запустить Docker Desktop и дождаться демона.
 docker info *> $null
 if ($LASTEXITCODE -ne 0) {
-  Write-Err "Docker установлен, но демон не отвечает. Запустите Docker Desktop и повторите."
-  Write-Err "  $DockerDesktopUrl"
-  exit 1
+  Write-Info "Запускаю Docker Desktop…"
+  $dd = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
+  if (Test-Path $dd) { Start-Process $dd } else { Start-Process 'Docker Desktop' -ErrorAction SilentlyContinue }
+  if (-not (Wait-Docker)) {
+    Write-Err "Docker не поднялся. Открой Docker Desktop вручную, дождись готовности и запусти снова:"
+    Write-Err "  $DockerDesktopUrl"
+    exit 1
+  }
 }
 
 # Compose v2 (плагин `docker compose`) или legacy `docker-compose`.

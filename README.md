@@ -55,11 +55,13 @@ https://github.com/Nivanov129/job_finder_agent/blob/main/llms.md
 
 ### 1. Docker
 
-Нужен Docker Desktop (или Docker Engine + Compose v2 на Linux). Установка самого
-Docker — на вас: <https://www.docker.com/products/docker-desktop/>. Установщик
-проверит наличие Docker и демона, но ставить его не будет.
+Нужен Docker (Desktop на macOS/Windows, Engine + Compose v2 на Linux). **Установщик
+ставит Docker сам, если его нет** (macOS — Homebrew или официальный `.dmg`;
+Windows — `winget`; Linux — `get.docker.com`), запускает его и ждёт готовности
+демона. На macOS попросит пароль `sudo`; при сбое авто-установки — поставьте
+вручную: <https://www.docker.com/products/docker-desktop/> и запустите снова.
 
-Запустите тонкий установщик из корня репозитория:
+Запустите установщик из корня репозитория:
 
 ```sh
 ./install.sh          # macOS / Linux

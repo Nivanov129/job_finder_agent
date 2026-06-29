@@ -26,18 +26,82 @@ info()  { printf '\033[0;36m==>\033[0m %s\n' "$*"; }
 warn()  { printf '\033[0;33m!!\033[0m %s\n' "$*" >&2; }
 error() { printf '\033[0;31mxx\033[0m %s\n' "$*" >&2; }
 
-# --- 1. Docker -------------------------------------------------------------
+# --- 1. Docker (ставим сами, если нет) -------------------------------------
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+
+# Дождаться, пока демон Docker ответит (после запуска приложения это не мгновенно).
+start_docker_and_wait() {
+  if ! docker info >/dev/null 2>&1; then
+    info "Запускаю Docker…"
+    case "$OS" in
+      Darwin) open -a Docker >/dev/null 2>&1 || true ;;
+      Linux)  sudo systemctl enable --now docker >/dev/null 2>&1 \
+                || sudo service docker start >/dev/null 2>&1 || true ;;
+    esac
+    info "Жду готовности Docker (до ~3 минут; может попросить пароль или принять условия)…"
+    for _ in $(seq 1 90); do
+      docker info >/dev/null 2>&1 && break
+      sleep 2
+    done
+  fi
+  if ! docker info >/dev/null 2>&1; then
+    error "Docker не поднялся. Открой Docker Desktop вручную, дождись готовности и запусти снова:"
+    error "  $DOCKER_DESKTOP_URL"
+    exit 1
+  fi
+}
+
+install_docker_macos() {
+  if command -v brew >/dev/null 2>&1; then
+    info "Ставлю Docker Desktop через Homebrew…"
+    brew install --cask docker
+  else
+    case "$ARCH" in
+      arm64) url="https://desktop.docker.com/mac/main/arm64/Docker.dmg" ;;
+      *)     url="https://desktop.docker.com/mac/main/amd64/Docker.dmg" ;;
+    esac
+    local tmp dmg
+    tmp="$(mktemp -d)"; dmg="$tmp/Docker.dmg"
+    info "Скачиваю Docker Desktop (~600 МБ — это займёт время)…"
+    curl -fSL --progress-bar "$url" -o "$dmg" || return 1
+    info "Устанавливаю Docker (потребуется пароль администратора)…"
+    sudo hdiutil attach "$dmg" -nobrowse -quiet || return 1
+    local rc=0
+    sudo /Volumes/Docker/Docker.app/Contents/MacOS/install --accept-license || rc=$?
+    hdiutil detach /Volumes/Docker -quiet >/dev/null 2>&1 || true
+    rm -rf "$tmp"
+    return "$rc"
+  fi
+}
+
+install_docker_linux() {
+  info "Ставлю Docker Engine (официальный скрипт get.docker.com, нужен sudo)…"
+  curl -fsSL https://get.docker.com -o /tmp/get-docker.sh || return 1
+  sudo sh /tmp/get-docker.sh || return 1
+  sudo usermod -aG docker "$USER" 2>/dev/null || true
+}
+
 if ! command -v docker >/dev/null 2>&1; then
-  error "Docker не найден. Установите Docker Desktop и запустите снова:"
-  error "  $DOCKER_DESKTOP_URL"
-  exit 1
+  warn "Docker не найден — поставлю автоматически (это нормально для первого запуска)."
+  case "$OS" in
+    Darwin)
+      install_docker_macos || {
+        error "Не смог поставить Docker сам. Поставь вручную и запусти снова: $DOCKER_DESKTOP_URL"
+        exit 1
+      } ;;
+    Linux)
+      install_docker_linux || {
+        error "Не смог поставить Docker сам. Поставь вручную: https://docs.docker.com/engine/install/"
+        exit 1
+      } ;;
+    *)
+      error "Не знаю, как поставить Docker на эту систему. Поставь вручную: $DOCKER_DESKTOP_URL"
+      exit 1 ;;
+  esac
 fi
 
-if ! docker info >/dev/null 2>&1; then
-  error "Docker установлен, но демон не отвечает. Запустите Docker Desktop и повторите."
-  error "  $DOCKER_DESKTOP_URL"
-  exit 1
-fi
+start_docker_and_wait
 
 # Compose v2 (плагин `docker compose`) или legacy `docker-compose`.
 if docker compose version >/dev/null 2>&1; then
