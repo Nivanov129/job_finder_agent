@@ -201,13 +201,17 @@ class TelegramLogin:  # pragma: no cover - async Telethon / реальная с�
         from telethon.errors import SessionPasswordNeededError
 
         async def _go() -> tuple[str, str | None]:
+            # 2FA-аккаунт: после скана сервер требует пароль — и это всплывает не
+            # только из wait(), но и из recreate() (он зовёт ExportLoginToken).
+            # Поэтому ловим SessionPasswordNeededError вокруг ОБОИХ вызовов.
             try:
-                await self._qr.wait(timeout=3)
-                return "ok", None
-            except TimeoutError:
-                # Токен живёт ~30с — пересоздаём и отдаём свежий QR.
-                await self._qr.recreate()
-                return "wait", self._qr.url
+                try:
+                    await self._qr.wait(timeout=3)
+                    return "ok", None
+                except TimeoutError:
+                    # Токен живёт ~30с — пересоздаём и отдаём свежий QR.
+                    await self._qr.recreate()
+                    return "wait", self._qr.url
             except SessionPasswordNeededError:
                 return "password", None
 
