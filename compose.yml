@@ -36,8 +36,12 @@ services:
     environment:
       # Внутри compose-сети пайплайн ходит на http://searxng:8080.
       SEARXNG_BASE_URL: http://searxng:8080/
+      # Секрет подписи сессий локального инстанса — из env/.env, не хардкод.
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-job-agent-local-dev-secret}
     volumes:
-      - searxng_config:/etc/searxng
+      # Версионируемый override (use_default_settings + json-формат), чтобы
+      # web-поиск работал на свежей установке без ручной правки тома.
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
     ports:
       # Открыт на localhost для отладки/калибровки; продукт не хостит наружу.
       - "127.0.0.1:8080:8080"
@@ -92,6 +96,13 @@ services:
     environment:
       # webui лежит в /app (не отдельный пакет) — кладём его на путь импорта.
       PYTHONPATH: /app
+      # Та же seen-БД и тот же web-поиск, что у пайплайна: прогоны из UI должны
+      # копить «виденное» на постоянном томе и ходить в SearXNG по compose-сети.
+      JOB_AGENT_SEEN_DB: /var/lib/job-agent/job_agent_seen.db
+      JOB_AGENT_SEARXNG_URL: http://searxng:8080
+    depends_on:
+      searxng:
+        condition: service_started
     env_file:
       # Те же токены авторизации, что у пайплайна: статус-пробы и «Проверить» на
       # странице «AI · авторизация» должны видеть ту же авторизацию.
@@ -106,6 +117,9 @@ services:
       # Тот же изолированный конфиг-дир CLI-агентов, что у пайплайна (см. выше).
       - ${JOB_AGENT_CLAUDE_DIR:-./data/auth/claude}:/root/.claude
       - ${JOB_AGENT_CODEX_DIR:-./data/auth/codex}:/root/.codex
+      # Постоянный seen-store (тот же том, что у пайплайна) — «виденное»
+      # переживает пересборку образа.
+      - seen_store:/var/lib/job-agent
     ports:
       # Опубликован на всех интерфейсах хоста — UI доступен из локальной сети
       # (http://<IP-хоста>:8766). ВНИМАНИЕ: у UI нет аутентификации, а форма

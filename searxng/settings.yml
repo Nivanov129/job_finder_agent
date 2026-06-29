@@ -1,0 +1,11 @@
+# Локальный SearXNG для web-поиска контактов (этап обогащения).
+# use_default_settings подмешивает полный дефолт образа — переопределяем только
+# то, что нужно продукту: формат вывода json (без него API отдаёт 403) и
+# отключённый лимитер для локальной compose-сети. Секрет — через ${SEARXNG_SECRET}.
+use_default_settings: true
+server:
+  limiter: false
+search:
+  formats:
+    - html
+    - json

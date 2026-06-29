@@ -111,6 +111,22 @@ def _telethon_fetcher(creds: TelethonCreds) -> MessageFetcher:  # pragma: no cov
 
         since_aware = _as_aware(since)
 
+        async def _resolve_target(client: object, h: str) -> object:
+            """Цель для iter_messages: @username — как есть; числовой id канала
+            нужно «пометить» (-100…) и прогреть кэш сущностей диалогами, иначе
+            Telethon не знает access_hash и падает «Cannot find any entity»."""
+            digits = h.lstrip("-")
+            if not digits.isdigit():
+                return h
+            cid = int(h)
+            await client.get_dialogs()  # наполняет кэш access_hash по подпискам
+            if cid > 0:  # «сырой» id канала → помеченная форма -100<id>
+                from telethon.tl.types import PeerChannel
+                from telethon.utils import get_peer_id
+
+                return get_peer_id(PeerChannel(cid))
+            return cid
+
         async def _run() -> list[PrivateMessage]:
             client = TelegramClient(
                 StringSession(creds.session),
@@ -120,7 +136,8 @@ def _telethon_fetcher(creds: TelethonCreds) -> MessageFetcher:  # pragma: no cov
             await client.start()
             msgs: list[PrivateMessage] = []
             try:
-                async for msg in client.iter_messages(handle):
+                target = await _resolve_target(client, handle)
+                async for msg in client.iter_messages(target):
                     if msg.date is not None and _as_aware(msg.date) < since_aware:
                         break  # iter_messages идёт от новых к старым
                     text = msg.message or ""
