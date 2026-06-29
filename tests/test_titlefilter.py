@@ -66,3 +66,22 @@ def test_filter_keeps_matching_case_insensitive() -> None:
 def test_filter_empty_titles_keeps_all() -> None:
     posts = [_post("a"), _post("b")]
     assert filter_posts_by_titles(posts, []) == posts
+
+
+def test_filter_lenient_word_match_keeps_phrasings() -> None:
+    """Грубый фильтр щадящий: ловит дефис/пробел, порядок слов, предлоги, окончания."""
+    from job_agent.models import RawPost
+    from job_agent.titlefilter import filter_posts_by_titles
+
+    titles = ["Product Manager", "Продакт-менеджер", "Менеджер продукта"]
+    keep = [
+        "Продакт менеджер в финтех",   # пробел вместо дефиса
+        "Продуктовый менеджер",        # другое словообразование
+        "Менеджер по продукту",        # предлог между словами
+        "Senior Product Manager",      # с грейдом
+    ]
+    drop = ["Бэкенд-разработчик Python", "Дизайнер интерфейсов"]
+    posts = [RawPost(raw_text=s, source="x") for s in keep + drop]
+    kept = {p.raw_text for p in filter_posts_by_titles(posts, titles)}
+    assert set(keep) <= kept, keep
+    assert not (set(drop) & kept), drop

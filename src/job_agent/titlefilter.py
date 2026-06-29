@@ -10,12 +10,35 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterable
 
 from .engines.base import Engine
 from .models import RawPost
 
 __all__ = ["derive_titles", "filter_posts_by_titles", "parse_titles", "build_prompt"]
+
+_WORD_RE = re.compile(r"[а-яёa-z0-9]+", re.IGNORECASE)
+
+
+def _words(text: str) -> list[str]:
+    """Значимые слова (≥4 символов) в нижнем регистре — для пословного матча."""
+    return [w for w in _WORD_RE.findall(text.lower()) if len(w) >= 4]
+
+
+def _stem_match(a: str, b: str) -> bool:
+    """Слова «совпадают», если одно — префикс другого или общий префикс ≥5.
+
+    Устойчиво к окончаниям/языку: «менеджер»↔«менеджеру», «manager»↔«managers».
+    """
+    if a == b or a.startswith(b) or b.startswith(a):
+        return True
+    common = 0
+    for ca, cb in zip(a, b, strict=False):
+        if ca != cb:
+            break
+        common += 1
+    return common >= 5
 
 _TEMPLATE = (
     "Вот резюме кандидата. Выведи 10–15 КОРОТКИХ названий должности (1–3 слова), "
@@ -58,12 +81,30 @@ def derive_titles(engine: Engine, resume_text: str) -> list[str]:
 def filter_posts_by_titles(
     posts: Iterable[RawPost], titles: list[str]
 ) -> list[RawPost]:
-    """Оставить посты, в тексте которых есть хотя бы одно название (без учёта регистра).
+    """Оставить посты, чей текст несёт какое-то из названий ролей — ПОСЛОВНО.
 
-    Пустой список названий → ничего не фильтруем (возвращаем всё как есть).
+    Раньше матчили точную подстроку названия, и русские формулировки терялись:
+    «Продакт-менеджер» не ловил «продакт менеджер» (пробел) / «продуктовый
+    менеджер» / «менеджер по продукту». Теперь пост проходит, если для какого-то
+    названия ВСЕ его значимые слова (≥4 симв.) встречаются в тексте по стему —
+    устойчиво к дефису/пробелу, порядку слов, предлогам и окончаниям. Фильтр
+    грубый и щадящий (точную фильтрацию делают гейт ролей и скоринг дальше).
+
+    Пустой список названий → ничего не фильтруем.
     """
     posts = list(posts)
     if not titles:
         return posts
-    lowered = [t.lower() for t in titles]
-    return [p for p in posts if any(t in p.raw_text.lower() for t in lowered)]
+    # Каждое название → набор значимых слов; пустые (короткие) отбрасываем.
+    title_words = [ws for t in titles if (ws := _words(t))]
+    if not title_words:
+        return posts
+    out: list[RawPost] = []
+    for post in posts:
+        post_words = _words(post.raw_text)
+        if post_words and any(
+            all(any(_stem_match(rw, pw) for pw in post_words) for rw in ws)
+            for ws in title_words
+        ):
+            out.append(post)
+    return out
