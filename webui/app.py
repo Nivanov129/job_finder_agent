@@ -187,7 +187,7 @@ def create_app(
     logins = LoginManager(
         envfile, spawn=login_spawner or default_spawner(envfile)
     )
-    runner = backfill_runner or BackfillRunner()
+    runner = backfill_runner or BackfillRunner(results_dir=target.parent)
     # Telethon-логин ленив (создаёт фоновый event loop) — поднимаем при первом
     # обращении; в тестах подменяется через telegram_login.
     _tg: dict[str, object] = {"login": telegram_login}

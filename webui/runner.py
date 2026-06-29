@@ -118,10 +118,16 @@ def result_to_dict(er: Any) -> dict[str, Any]:
 class BackfillRunner:
     """Прогоны (разовый + агент) в фоне; потокобезопасный статус."""
 
-    def __init__(self, *, run: BackfillFn | None = None) -> None:
+    def __init__(
+        self, *, run: BackfillFn | None = None, results_dir: Path | str | None = None
+    ) -> None:
         self._run = run or _default_run
+        # Каталог данных: при старте подхватываем подборку прошлого прогона из
+        # results.json — иначе на свежем процессе (рестарт стека) UI был пустой,
+        # пока не запустишь новый прогон. Прогон перезапишет файл.
+        self._results_dir = Path(results_dir) if results_dir is not None else None
         self._state = RunState()
-        self._results: list[dict[str, Any]] = []  # результаты текущего/последнего прогона
+        self._results: list[dict[str, Any]] = self._load_persisted()
         self._feed: list[dict[str, Any]] = []  # живая лента: что AI читает/оценивает
         self._lock = threading.Lock()
         # агент
@@ -157,6 +163,14 @@ class BackfillRunner:
     def results(self) -> list[dict[str, Any]]:
         with self._lock:
             return list(self._results)
+
+    def _load_persisted(self) -> list[dict[str, Any]]:
+        """Подборка прошлого прогона из results.json (или [], если нет/каталог не задан)."""
+        if self._results_dir is None:
+            return []
+        from job_agent.mcp_server import load_matches
+
+        return load_matches(self._results_dir)
 
     def _on_result(self, item: dict[str, Any]) -> None:
         with self._lock:

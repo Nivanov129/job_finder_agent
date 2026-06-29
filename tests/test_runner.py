@@ -107,3 +107,17 @@ def test_runner_single_run_at_a_time(tmp_path: Path) -> None:
     gate.set()
     _wait(runner)
     assert runner.state()["status"] == "done"
+
+
+def test_runner_seeds_results_from_results_json(tmp_path: Path) -> None:
+    """Подборка прошлого прогона подхватывается из results.json при старте."""
+    (tmp_path / "results.json").write_text(
+        '[{"role": "PM", "company": "Acme"}]', encoding="utf-8"
+    )
+    runner = BackfillRunner(results_dir=tmp_path)
+    assert runner.results() == [{"role": "PM", "company": "Acme"}]
+
+
+def test_runner_empty_results_without_dir_or_file(tmp_path: Path) -> None:
+    assert BackfillRunner().results() == []
+    assert BackfillRunner(results_dir=tmp_path).results() == []  # файла нет
