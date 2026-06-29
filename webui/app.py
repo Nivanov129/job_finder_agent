@@ -527,8 +527,10 @@ def create_app(
 
     @app.post("/telegram/logout")
     async def telegram_logout() -> JSONResponse:
-        # Выход: убрать сессию из .env (api_id/api_hash оставляем — они постоянны).
+        # Выход: убрать сессию и из .env, И из os.environ процесса (она там с
+        # запуска контейнера через env_file) — иначе страница думает, что вошли.
         merge_env(envfile, {"TELEGRAM_SESSION": None})
+        os.environ.pop("TELEGRAM_SESSION", None)
         return JSONResponse({"ok": True})
 
     @app.post("/telegram/login/code")

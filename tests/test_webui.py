@@ -565,13 +565,18 @@ def test_telegram_channels_lists(tmp_path: Path) -> None:
     assert "job_count" in data  # число каналов с вакансиями
 
 
-def test_telegram_logout_clears_session(tmp_path: Path) -> None:
+def test_telegram_logout_clears_session(tmp_path: Path, monkeypatch) -> None:
     env = tmp_path / ".env"
     env.write_text("TELEGRAM_SESSION=abc\nTELEGRAM_API_ID=1\n", encoding="utf-8")
+    # сессия есть и в окружении процесса (как в контейнере через env_file)
+    monkeypatch.setenv("TELEGRAM_SESSION", "abc")
     client = TestClient(create_app(config_path=tmp_path / "config.json"))
     assert client.post("/telegram/logout").json()["ok"] is True
     text = env.read_text(encoding="utf-8")
     assert "TELEGRAM_SESSION" not in text and "TELEGRAM_API_ID=1" in text
+    # и из os.environ убрана — иначе страница думает, что вошли
+    import os
+    assert "TELEGRAM_SESSION" not in os.environ
 
 
 def test_telegram_save_writes_private_channels(tmp_path: Path) -> None:
